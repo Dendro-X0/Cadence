@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm --prefix ../../../ run dev:web",
-    "beforeBuildCommand": "npm --prefix ../../../ run build:web"
+    "beforeDevCommand": "npm --prefix \"G:/Web Development Project/Codebases/cadence\" run dev:web",
+    "beforeBuildCommand": "npm --prefix \"G:/Web Development Project/Codebases/cadence\" run build:web"
   },
   "app": {
     "windows": [
