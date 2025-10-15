@@ -1,0 +1,10 @@
+{
+  "name": "@cadence/notifications",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Notification adapters for web and desktop",
+  "exports": {
+    "./*": "./src/*"
+  }
+}

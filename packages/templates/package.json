@@ -1,0 +1,12 @@
+{
+  "name": "@cadence/templates",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Built-in templates and utilities for Cadence",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "dependencies": {
+  }
+}

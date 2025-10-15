@@ -1,0 +1,13 @@
+{
+  "name": "@cadence/storage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Storage repositories and adapters for Cadence",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "idb": "^8.0.0"
+  }
+}

@@ -1,13 +1,22 @@
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { fileURLToPath } from 'node:url'
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365
+const r = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 
 export default defineConfig({
   clearScreen: false,
   server: {
     port: 5173,
     strictPort: true
+  },
+  resolve: {
+    alias: {
+      '@cadence/core-domain': r('../../packages/core-domain/src'),
+      '@cadence/storage': r('../../packages/storage/src'),
+      '@cadence/templates': r('../../packages/templates/src')
+    }
   },
   plugins: [
     VitePWA({

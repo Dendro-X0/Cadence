@@ -12,7 +12,10 @@
     "typecheck": "tsc -b --pretty"
   },
   "dependencies": {
-    "idb": "^8.0.0"
+    "idb": "^8.0.0",
+    "@cadence/core-domain": "file:../../packages/core-domain",
+    "@cadence/storage": "file:../../packages/storage",
+    "@cadence/templates": "file:../../packages/templates"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

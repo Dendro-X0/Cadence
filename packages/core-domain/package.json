@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Domain types and engine for Cadence (Focus Motive)",
+  "description": "Domain types and engines for Cadence (Focus Motive)",
   "exports": {
-    ".": "./src/README.md"
+    "./*": "./src/*"
   }
 }

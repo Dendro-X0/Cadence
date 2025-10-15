@@ -1,5 +1,5 @@
 import { registerSW } from 'virtual:pwa-register'
-import { appConstants } from './core/constants'
+import { appConstants } from '@cadence/core-domain/constants'
 
 /**
  * Setup PWA service worker with simple update prompt.
@@ -15,7 +15,7 @@ export function setupPwa(): void {
   })
 }
 
-function showToast(message: string): void {
+export function showToast(message: string): void {
   let el = document.querySelector<HTMLDivElement>('#toast')
   if (!el) {
     el = document.createElement('div')

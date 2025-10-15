@@ -1,5 +1,5 @@
-import type { Task } from './types'
-import { FocusRepository } from '../data/focus-repository'
+import type { Task } from '@cadence/core-domain/task'
+import { FocusRepository } from '@cadence/storage/focus-repository'
 
 /**
  * TaskManager coordinates task CRUD for the UI.
