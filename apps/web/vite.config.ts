@@ -2,9 +2,11 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365 as const
+const base = process.env.VITE_BASE ?? '/'
 
 export default defineConfig({
   clearScreen: false,
+  base,
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
