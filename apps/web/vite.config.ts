@@ -15,7 +15,8 @@ export default defineConfig({
     alias: {
       '@cadence/core-domain': r('../../packages/core-domain/src'),
       '@cadence/storage': r('../../packages/storage/src'),
-      '@cadence/templates': r('../../packages/templates/src')
+      '@cadence/templates': r('../../packages/templates/src'),
+      '@cadence/notifications': r('../../packages/notifications/src')
     }
   },
   plugins: [

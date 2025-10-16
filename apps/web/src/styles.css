@@ -22,3 +22,31 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-appl
 .task-title.done{text-decoration:line-through;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#0f172a;border:1px solid #1f2937;color:var(--fg);padding:10px 12px;border-radius:10px;display:none}
 .toast.show{display:block}
+
+/* Themes */
+[data-theme="light"]{--bg:#f8fafc;--fg:#0f172a;--muted:#475569;--brand:#2563eb;--card:#ffffff;--accent:#3b82f6}
+[data-theme="amoled"]{--bg:#000;--fg:#d1d5db;--muted:#6b7280;--brand:#22d3ee;--card:#050505;--accent:#06b6d4}
+
+/* Circular timer */
+.circle-wrap{width:160px;height:160px;position:relative;display:none}
+.circle-wrap.show{display:block}
+.circle-wrap svg{transform:rotate(-90deg)}
+.circle-bg{stroke:#1f2937;stroke-width:12;fill:none}
+.circle-prog{stroke:var(--accent);stroke-linecap:round;stroke-width:12;fill:none;transition:stroke-dashoffset .2s linear}
+.circle-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700}
+
+/* Settings panel */
+.settings-panel{position:fixed;right:16px;top:64px;background:var(--card);border:1px solid #1f2937;border-radius:12px;padding:12px;min-width:260px;display:none;z-index:30}
+.settings-panel.show{display:block}
+.settings-row{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
+.switch{appearance:none;width:40px;height:22px;background:#1f2937;border-radius:20px;position:relative;outline:none;cursor:pointer}
+.switch:checked{background:var(--brand)}
+.switch:before{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left .2s}
+.switch:checked:before{left:21px}
+.select{background:#0f172a;color:var(--fg);border:1px solid #1f2937;border-radius:8px;padding:6px 8px}
+.gear{background:#1f2937;color:var(--fg)}
+
+/* Mini bubble */
+#mini{position:fixed;right:16px;bottom:16px;background:var(--card);border:1px solid #1f2937;color:var(--fg);padding:10px 12px;border-radius:12px;display:none;z-index:40}
+#mini.show{display:block}
+#mini .mini-time{font-size:18px;font-weight:700}

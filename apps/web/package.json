@@ -15,7 +15,9 @@
     "idb": "^8.0.0",
     "@cadence/core-domain": "file:../../packages/core-domain",
     "@cadence/storage": "file:../../packages/storage",
-    "@cadence/templates": "file:../../packages/templates"
+    "@cadence/templates": "file:../../packages/templates",
+    "@cadence/notifications": "file:../../packages/notifications",
+    "@tauri-apps/api": "^2.0.0"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
