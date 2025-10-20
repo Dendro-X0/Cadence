@@ -24,7 +24,7 @@
     "typecheck": "npm --workspace apps/web run typecheck",
     "tauri": "npm --workspace apps/desktop run tauri",
     "changeset": "changeset",
-    "version:repo": "changeset version && pnpm -w install --no-frozen-lockfile",
+    "version:repo": "changeset version && npm install",
     "release": "pnpm -w build"
   },
   "devDependencies": {

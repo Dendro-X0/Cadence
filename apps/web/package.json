@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 4174"
+    "preview": "vite preview --port 4174",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
     "@cadence/core-domain": "file:../../packages/core-domain",
@@ -24,6 +25,7 @@
     "typescript": "^5.9.2",
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^1.1.0",
-    "vite-tsconfig-paths": "^4.3.2"
+    "vite-tsconfig-paths": "^4.3.2",
+    "svelte-check": "^4.0.0"
   }
 }
