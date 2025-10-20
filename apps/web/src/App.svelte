@@ -11,6 +11,7 @@
   import CountdownOverlay from './components/overlays/countdown.svelte'
   import ShortcutsOverlay from './components/overlays/shortcuts.svelte'
   import ConfirmOverlay from './components/overlays/confirm.svelte'
+  import UpdateToast from './components/overlays/update-toast.svelte'
   import { overlays, hideShortcuts, toggleShortcuts } from './stores/overlays'
 
   let active: 'timer'|'templates'|'settings'|'shortcuts' = 'timer'
@@ -60,14 +61,30 @@
     const onShortcuts = parseShortcut(s.shortcutShortcutsTab)
     const onHelp = parseShortcut(s.shortcutHelp)
 
+    const isTextEditingTarget = (e: KeyboardEvent): boolean => {
+      const t = e.target as HTMLElement | null
+      if (!t) return false
+      const tag = (t.tagName || '').toLowerCase()
+      if (tag === 'textarea') return true
+      if (t.isContentEditable) return true
+      if (tag === 'input') {
+        const type = ((t as HTMLInputElement).type || '').toLowerCase()
+        const nonText: readonly string[] = ['checkbox','radio','range','button','submit','reset','color','file','image']
+        if (nonText.includes(type)) return false
+        return true
+      }
+      return false
+    }
+
     const handler = (e: KeyboardEvent): void => {
       if (onHelp(e)) { e.preventDefault(); toggleShortcuts(); return }
-      if (onTimer(e)) { active = 'timer'; hideShortcuts(); return }
-      if (onTemplates(e)) { active = 'templates'; hideShortcuts(); return }
-      if (onSettings(e)) { active = 'settings'; hideShortcuts(); return }
-      if (onShortcuts(e) && !isMobile) { active = 'shortcuts'; hideShortcuts(); return }
+      const typing = isTextEditingTarget(e)
+      if (!typing && onTimer(e)) { e.preventDefault(); active = 'timer'; hideShortcuts(); return }
+      if (!typing && onTemplates(e)) { e.preventDefault(); active = 'templates'; hideShortcuts(); return }
+      if (!typing && onSettings(e)) { e.preventDefault(); active = 'settings'; hideShortcuts(); return }
+      if (!typing && onShortcuts(e)) { e.preventDefault(); active = isMobile ? 'settings' : 'shortcuts'; hideShortcuts(); return }
       if (onStartPause(e)) {
-        // TimerPage handles the action bound to Start/Pause button; we dispatch a custom event
+        e.preventDefault()
         const ev = new CustomEvent('cadence:startpause')
         window.dispatchEvent(ev)
         hideShortcuts()
@@ -114,6 +131,7 @@
 <CountdownOverlay visible={$overlays.countdownVisible} seconds={$overlays.countdownSeconds} />
 <ShortcutsOverlay visible={$overlays.shortcutsVisible} on:close={() => hideShortcuts()} />
 <ConfirmOverlay visible={$overlays.confirmVisible} />
+<UpdateToast visible={$overlays.updateVisible} />
 </div>
 
 <style>

@@ -11,9 +11,11 @@ export type OverlaysState = {
   readonly confirmCancelLabel?: string
   readonly confirmSummary?: readonly { label: string; minutes: number; type?: string }[]
   readonly confirmRepeat?: number
+  readonly updateVisible?: boolean
+  readonly updateMessage?: string
 }
 
-const initial: OverlaysState = { countdownVisible: false, countdownSeconds: 3, shortcutsVisible: false, confirmVisible: false }
+const initial: OverlaysState = { countdownVisible: false, countdownSeconds: 3, shortcutsVisible: false, confirmVisible: false, updateVisible: false, updateMessage: undefined }
 export const overlays: Writable<OverlaysState> = writable(initial)
 
 export async function showCountdown(seconds: number): Promise<void> {
@@ -67,4 +69,20 @@ export function confirmAccept(): void {
 export function confirmCancel(): void {
   if (confirmResolver) { confirmResolver(false); confirmResolver = null }
   overlays.update((o) => ({ ...o, confirmVisible: false }))
+}
+
+// Update toast (PWA SW refresh)
+let updateApply: (() => void) | null = null
+export function showUpdateToast(message: string, apply: () => void): void {
+  updateApply = apply
+  overlays.update((o) => ({ ...o, updateVisible: true, updateMessage: message }))
+}
+export function acceptUpdate(): void {
+  const fn = updateApply; updateApply = null
+  overlays.update((o) => ({ ...o, updateVisible: false }))
+  if (fn) fn()
+}
+export function dismissUpdate(): void {
+  updateApply = null
+  overlays.update((o) => ({ ...o, updateVisible: false }))
 }

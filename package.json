@@ -22,9 +22,13 @@
     "preview:web": "npm --workspace apps/web run preview",
     "preview:web-svelte": "npm --workspace apps/web-svelte run preview",
     "typecheck": "npm --workspace apps/web run typecheck",
-    "tauri": "npm --workspace apps/desktop run tauri"
+    "tauri": "npm --workspace apps/desktop run tauri",
+    "changeset": "changeset",
+    "version:repo": "changeset version && pnpm -w install --no-frozen-lockfile",
+    "release": "pnpm -w build"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1"
+    "concurrently": "^9.0.1",
+    "@changesets/cli": "^2.28.1"
   }
 }

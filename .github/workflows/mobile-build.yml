@@ -49,11 +49,12 @@ jobs:
       # Signing is optional for CI builds; to sign, provide keystore secrets and uncomment the envs below.
       - name: Build Android (Tauri Mobile)
         working-directory: apps/desktop
-        env:
-          # ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          # ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          # ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          # ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        # To sign the AAB/APK, add the following env vars via repo secrets and uncomment:
+        # env:
+        #   ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        #   ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        #   ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        #   ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           pnpm tauri android build
 
@@ -105,11 +106,12 @@ jobs:
       # For code signing and export to IPA, configure App Store Connect API keys as secrets and pass to build/export.
       - name: Build iOS (Tauri Mobile)
         working-directory: apps/desktop
-        env:
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          # APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          # APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        # For code signing/export to IPA, configure the following env vars via secrets and uncomment:
+        # env:
+        #   APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        #   APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        #   APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        #   APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         run: |
           pnpm tauri ios build
 

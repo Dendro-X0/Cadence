@@ -15,6 +15,14 @@
       "csp": null
     }
   },
+  "updater": {
+    "active": true,
+    "endpoints": [
+      "https://github.com/Dendro-X0/Cadence/releases/latest/download/latest.json"
+    ]
+    
+    
+  },
   "bundle": {
     "active": true,
     "targets": "all",

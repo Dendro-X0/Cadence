@@ -1,12 +1,12 @@
 /// <reference types="vite-plugin-pwa/client" />
 import { registerSW } from 'virtual:pwa-register'
+import { showUpdateToast } from './stores/overlays'
 
 export function setupPwa(): void {
   const updateSW = registerSW({
     immediate: true,
     onNeedRefresh() {
-      const should = window.confirm('An update is available. Reload to apply?')
-      if (should) updateSW(true)
+      showUpdateToast('An update is available.', () => updateSW(true))
     },
     onOfflineReady() {
       // Optional: show a small note or toast that the app is ready offline
