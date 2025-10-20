@@ -1,0 +1,35 @@
+:root{
+  --brand:#0ea5e9;
+  --brand-2:#22d3ee;
+  --fg:#e2e8f0;
+  --muted:#94a3b8;
+  --bg:#0b1020;
+  --surface-1:#0f172a;
+  --surface-2:#111827;
+  --border:#1f2937;
+  --danger:#ef4444;
+  --radius-s:8px;
+  --radius-m:12px;
+  --radius-l:16px;
+  --space-1:6px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-5:24px;
+}
+
+:root[data-theme='light']{
+  --bg:#f8fafc;
+  --surface-1:#ffffff;
+  --surface-2:#f1f5f9;
+  --fg:#0b1324;
+  --border:#d1d5db;
+}
+
+:root[data-theme='amoled']{
+  --bg:#000000;
+  --surface-1:#050505;
+  --surface-2:#0a0a0a;
+  --fg:#e5e7eb;
+  --border:#171717;
+}

@@ -4,20 +4,13 @@
   "version": "0.1.0",
   "identifier": "com.cadence.app",
   "build": {
-    "frontendDist": "../../web/dist",
-    "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm --prefix ../../web run build"
+    "frontendDist": "../../apps/web-svelte/dist",
+    "devUrl": "http://127.0.0.1:5174",
+    "beforeDevCommand": "npm --prefix ../../apps/web-svelte run dev",
+    "beforeBuildCommand": "npm --prefix ../../apps/web-svelte run build"
   },
   "app": {
-    "windows": [
-      {
-        "title": "@cadence/desktop",
-        "width": 800,
-        "height": 600,
-        "resizable": true,
-        "fullscreen": false
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }

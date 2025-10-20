@@ -12,6 +12,7 @@ declare module '@tauri-apps/api/webviewWindow' {
     decorations?: boolean
     resizable?: boolean
     alwaysOnTop?: boolean
+    transparent?: boolean
   }
   export class WebviewWindow {
     constructor(label: string, options?: WebviewWindowOptions)
@@ -21,6 +22,16 @@ declare module '@tauri-apps/api/webviewWindow' {
 }
 
 declare module '@tauri-apps/api/notification' {
+  export function isPermissionGranted(): Promise<boolean>
+  export function requestPermission(): Promise<'granted' | 'denied'>
+  export function sendNotification(options: { title: string; body?: string }): void
+}
+
+declare module '@tauri-apps/api/core' {
+  export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T>
+}
+
+declare module '@tauri-apps/plugin-notification' {
   export function isPermissionGranted(): Promise<boolean>
   export function requestPermission(): Promise<'granted' | 'denied'>
   export function sendNotification(options: { title: string; body?: string }): void

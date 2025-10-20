@@ -1,4 +1,4 @@
-import type { SessionTemplate } from '@cadence/core-domain/src/session-template'
+import type { SessionTemplate } from '@cadence/core-domain/session-template'
 
 export const builtInTemplates: readonly SessionTemplate[] = [
   {

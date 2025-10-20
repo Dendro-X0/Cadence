@@ -1,109 +1,319 @@
 import './styles.css'
 import { appConstants } from '@cadence/core-domain/constants'
-import type { Task } from '@cadence/core-domain/task'
 import type { Settings } from '@cadence/core-domain/settings'
-import { FocusTimer } from '@cadence/core-domain/focus-timer'
-import { ScheduleEngine } from '@cadence/core-domain/schedule-engine'
-import { TaskManager } from './core/task-manager'
+// Engine/timer are handled by engine-controller
 import { FocusRepository } from '@cadence/storage/focus-repository'
 import { builtInTemplates } from '@cadence/templates/defaults'
-import { setupPwa, showToast } from './pwa'
+import { setupPwa, showToast } from './services/pwa'
 import type { SessionTemplate } from '@cadence/core-domain/session-template'
 import type { SessionBlock } from '@cadence/core-domain/session-template'
-import { notify } from '@cadence/notifications/notifier'
+// notifications handled within settings panel
+import { Time } from './utils/time'
+import { Platform } from './utils/platform'
+import { showCountdownOverlay } from './ui/overlays/countdown-overlay'
+import { showShortcutsOverlay } from './ui/overlays/shortcuts-overlay'
+import { initDesktopWindowControls } from './services/window'
+import { wireEngineAndTimer } from './engine/engine-controller'
+import { renderTemplatesGallery } from './ui/templates-gallery'
+import { setAccent } from './ui/colors'
+import { setupTimerCard } from './ui/timer-card'
+import { setupTabs } from './ui/tabs'
+import { renderQuickChips } from './ui/templates-chips'
+import { setupSettingsPanel } from './ui/settings-panel'
+import { setupTemplateBuilder } from './ui/template-builder'
 
-const pad = (n: number): string => (n < 10 ? `0${n}` : `${n}`)
-const toTime = (ms: number): string => {
-  const total = Math.round(ms / 1000)
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${pad(m)}:${pad(s)}`
+// time formatting moved to utils/time
+
+// ensures pager container exists within gallery card
+function ensurePager(galleryCard: HTMLDivElement): HTMLDivElement {
+  let pager = galleryCard.querySelector<HTMLDivElement>('.pager-host')
+  if (!pager) {
+    pager = document.createElement('div')
+    pager.className = 'pager-host'
+    galleryCard.appendChild(pager)
+  }
+  return pager
 }
 
 const defaults: Settings = { sessionMinutes: appConstants.defaultSessionMinutes, autoStart: false }
 
-async function main(): Promise<void> {
-  const isMini = new URLSearchParams(window.location.search).get('mini') === '1'
+export async function main(): Promise<void> {
+  const isMini = new URL(location.href).searchParams.get('mini') === '1'
   setupPwa()
   if (isMini) { renderMini(); return }
-  const isDesktop = Boolean((window as unknown as { __TAURI__?: unknown }).__TAURI__)
+  const isDesktop = Platform.isDesktop
   let tauriEmit: ((event: string, payload?: unknown) => Promise<void>) | null = null
+  let tauriInvoke: (<T = unknown>(cmd: string, args?: Record<string, unknown>) => Promise<T>) | null = null
+  let activeLabel: string | null = null
   if (isDesktop) {
-    try { const mod = await import('@tauri-apps/api/event') as unknown as { emit: (e:string,p?:unknown)=>Promise<void> }; tauriEmit = (mod as any).emit } catch {}
-  }
-  ;(window as unknown as { __emitTick?: (e: string, p?: unknown) => Promise<void> }).__emitTick = tauriEmit ?? undefined
-  const { settings } = await FocusRepository.loadSettings(defaults)
-  const tm = new TaskManager()
-  const ui = buildUI({ settings, tm })
-  let engine: ScheduleEngine | null = null
-  const initialMs = settings.sessionMinutes * appConstants.msPerMinute
-  const timer = new FocusTimer({ durationMs: initialMs, onTick: (ms: number) => ui.setTime(ms) })
-  ui.setTotal(initialMs)
-  ui.onStart(() => timer.start())
-  ui.onPause(() => timer.pause())
-  ui.onReset((mins) => { const ms = mins * appConstants.msPerMinute; ui.setTotal(ms); timer.reset({ durationMs: ms }) })
-  ui.setTime(timer.remainingMs())
-  const { tasks } = await tm.list()
-  ui.renderTasks(tasks)
-  // Templates Gallery
-  const gallery = document.querySelector<HTMLDivElement>('#templates')!
-  renderTemplatesGallery(gallery, {
-    onStart: (tpl) => {
-      engine?.reset()
-      engine = new ScheduleEngine({
-        template: tpl,
-        events: {
-          onBlockStart: (_i, b) => { ui.setBlockLabels(b.label, engine?.nextBlock()?.label ?? null); ui.setTotal(b.durationMinutes * appConstants.msPerMinute); setAccent(b.type) },
-          onTick: (ms) => ui.setTime(ms),
-          onBlockEnd: () => { if (settings.soundEnabled) beep(880, 140); notify({ title: 'Block complete', body: 'Next block starting' }).catch(() => {}) },
-          onComplete: () => {
-            ui.setBlockLabels('Done', null)
-            ;(window as unknown as { __engine?: ScheduleEngine }).__engine = undefined
-            showToast('Schedule complete.')
-            if (settings.soundEnabled) { beep(880, 120); window.setTimeout(() => beep(660, 120), 150); window.setTimeout(() => beep(990, 120), 300) }
-            notify({ title: 'Schedule complete', body: 'Great job!' }).catch(() => {})
+    try {
+      const { emit, listen } = await import('@tauri-apps/api/event') as typeof import('@tauri-apps/api/event')
+      tauriEmit = emit
+      const { invoke } = await import('@tauri-apps/api/core') as typeof import('@tauri-apps/api/core')
+      tauriInvoke = invoke
+      // Listen for tray actions
+      await listen<{ action?: string; minutes?: number }>('cadence:tray', async (ev) => {
+        const action = ev?.payload?.action
+        switch (action) {
+          case 'start':
+            controller.startOrResume()
+            break
+          case 'pause':
+            controller.pauseCurrent()
+            break
+          case 'skip':
+            controller.skip()
+            break
+          case 'extend': {
+            const mins = ev?.payload?.minutes ?? 1
+            controller.extend(mins)
+            break
           }
+          case 'toggle_mini': {
+            try {
+              const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow') as typeof import('@tauri-apps/api/webviewWindow')
+              const existing = WebviewWindow.getByLabel ? WebviewWindow.getByLabel('mini') : undefined
+              const enable = !Boolean((window as unknown as { __mini?: boolean }).__mini)
+              if (enable && !existing) new WebviewWindow('mini', { width: 240, height: 90, decorations: false, resizable: false, alwaysOnTop: true, url: '/?mini=1' })
+              if (!enable && existing) existing.close()
+              ;(window as unknown as { __mini?: boolean }).__mini = enable
+              // persist setting
+              const next = { ...prefs, miniWindowEnabled: enable }
+              await FocusRepository.saveSettings({ settings: next })
+              prefs = next
+            } catch {}
+            break
+          }
+          default:
+            break
         }
       })
-      ;(window as unknown as { __engine?: ScheduleEngine }).__engine = engine
-      engine.start()
-      // Hook transport controls to engine while running
-      ui.onStart(() => engine?.start())
-      ui.onPause(() => engine?.pause())
-      ui.onReset((_mins) => engine?.reset())
-    },
-    onSave: async (tpl) => { await FocusRepository.saveTemplate({ tpl }); showToast('Template saved.') }
+    } catch {}
+  }
+  ;(window as unknown as { __emitTick?: (e: string, p?: unknown) => Promise<void> }).__emitTick = async (e: string, p?: unknown) => {
+    if (tauriEmit) { await tauriEmit(e, p) }
+    if (e === 'cadence:tick' && tauriInvoke) {
+      const ms = (p as { ms?: number })?.ms ?? 0
+      const text = `${Time.toTime(ms)}${activeLabel ? ` - ${activeLabel}` : ''}`
+      try { await tauriInvoke('set_tray_tooltip', { text }) } catch {}
+    }
+  }
+  const { settings } = await FocusRepository.loadSettings(defaults)
+  let prefs: Settings = { ...settings }
+  const ui = buildUI({ settings })
+  // keep prefs in sync with UI changes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(ui as any).onPrefsChanged?.((s: Settings) => { prefs = s; void refreshTemplatesUI?.() })
+  // Re-render templates UI when requested (e.g., delete)
+  window.addEventListener('cadence:refreshTemplates', () => { void refreshTemplatesUI?.() })
+  // Engine + Timer controller
+  const controller = wireEngineAndTimer({
+    ui,
+    prefs: settings,
+    defaultMinutes: appConstants.defaultSessionMinutes,
+    onActiveLabelChange: (label) => { activeLabel = label },
+    onBlockTypeChange: (t) => setAccent(t)
   })
+  // Keep prefs up to date inside controller
+  ;(ui as any).onPrefsChanged?.((s: Settings) => { prefs = s; controller.setPrefs(s); void refreshTemplatesUI?.() })
+  // Wire transport extras
+  ui.onSkip(() => controller.skip())
+  ui.onExtend((minutes) => controller.extend(minutes))
+  // Wrapper adds confirm + optional countdown before delegating to controller
+  const startTemplateWithConfirm = (tpl: SessionTemplate): void => {
+    const needConfirm = (prefs.askConfirmBeforeStart ?? true)
+    if (needConfirm) { const ok = window.confirm(`Start "${tpl.name}" now?`); if (!ok) return }
+    const delaySec = Math.max(0, Number(prefs.startCountdownSeconds ?? 3))
+    const go = (): void => controller.startWithTemplate(tpl)
+    if (delaySec > 0) showCountdownOverlay(delaySec, go); else go()
+  }
+  // No tasks section anymore
+  // Templates UI: chips + gallery with pin support
+  let chipsExpanded = false
+  let lastChips: readonly SessionTemplate[] = []
+  let shortcutsBound = false
+  const isTimerActive = (): boolean => {
+    const el = document.querySelector<HTMLDivElement>('#view-timer')
+    return Boolean(el && el.style.display !== 'none')
+  }
+  const norm = (s: string): string => {
+    const v = s.trim()
+    if (v.toLowerCase() === 'space') return ' '
+    return v.length === 1 ? v.toLowerCase() : v
+  }
+  const togglePlay = (): void => {
+    if (controller.hasEngine()) { controller.pauseCurrent() }
+    else { controller.startOrResume() }
+  }
+  const bindShortcuts = (): void => {
+    if (shortcutsBound) return
+    shortcutsBound = true
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      const helpKey = norm(prefs.shortcutHelp ?? '?')
+      const spKey = norm(prefs.shortcutStartPause ?? 'Space')
+      const tabT = norm(prefs.shortcutTimerTab ?? 't')
+      const tabTpl = norm(prefs.shortcutTemplatesTab ?? 'e')
+      const tabSet = norm(prefs.shortcutSettingsTab ?? 's')
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target as HTMLElement | null)?.isContentEditable) return
+      if (e.ctrlKey || e.altKey || e.metaKey) return
+      const key = e.key
+      if (norm(key) === helpKey) { e.preventDefault(); showShortcutsOverlay(prefs); return }
+      if (norm(key) === spKey) { e.preventDefault(); togglePlay(); return }
+      const clickTab = (page: 'timer'|'templates'|'settings'): void => {
+        const btn = document.querySelector<HTMLButtonElement>(`button.tab[data-page="${page}"]`)
+        btn?.click()
+      }
+      if (norm(key) === tabT) { e.preventDefault(); clickTab('timer'); return }
+      if (norm(key) === tabTpl) { e.preventDefault(); clickTab('templates'); return }
+      if (norm(key) === tabSet) { e.preventDefault(); clickTab('settings'); return }
+      if (!isTimerActive()) return
+      if (key >= '1' && key <= '9') {
+        const idx = Number(key) - 1
+        const tpl = lastChips[idx]
+        if (tpl) { e.preventDefault(); startTemplateWithConfirm(tpl) }
+      }
+    })
+  }
+  let galleryPage = 1
+  const PER_PAGE = 10 as const
+  const refreshTemplatesUI = async (): Promise<void> => {
+    const quickEl = document.querySelector<HTMLDivElement>('#quick-templates')
+    const btnMore = document.querySelector<HTMLButtonElement>('#chips-more')
+    const gallery = document.querySelector<HTMLDivElement>('#templates')!
+    const pagerHost = ensurePager(gallery)
+    const { templates: savedTpls } = await FocusRepository.listTemplates()
+    // Merge and de-duplicate by name: built-ins first, then saved
+    const byName = new Map<string, SessionTemplate>()
+    const order: string[] = []
+    const pushUnique = (arr: readonly SessionTemplate[]): void => {
+      arr.forEach((t) => { if (!byName.has(t.name)) { byName.set(t.name, t); order.push(t.name) } })
+    }
+    pushUnique(builtInTemplates)
+    pushUnique(savedTpls)
+    const pinned = prefs.pinnedTemplateNames ?? []
+    const pinFirst = (prefs.pinToTop ?? true)
+    const orderedAll: SessionTemplate[] = pinFirst
+      ? [
+          ...pinned.map((n) => byName.get(n)).filter(Boolean) as SessionTemplate[],
+          ...order.filter((n) => !pinned.includes(n)).map((n) => byName.get(n)!).filter(Boolean)
+        ]
+      : order.map((n) => byName.get(n)!).filter(Boolean)
+    // Render chips with color code and tooltip
+    if (quickEl) {
+      const LIMIT = 6 as const
+      const sliceForCollapsed = (): readonly SessionTemplate[] => {
+        // Ensure all pinned are visible when collapsed; fill remaining slots with next templates
+        const pinnedTpls = orderedAll.filter((t) => pinned.includes(t.name))
+        const rest = orderedAll.filter((t) => !pinned.includes(t.name))
+        const out: SessionTemplate[] = [...pinnedTpls]
+        for (const t of rest) { if (out.length >= LIMIT) break; out.push(t) }
+        return out
+      }
+      const items = chipsExpanded ? orderedAll : sliceForCollapsed()
+      lastChips = items
+      renderQuickChips(quickEl, { items, pinned, onStart: (tpl) => startTemplateWithConfirm(tpl) })
+      if (btnMore) {
+        const needsMore = orderedAll.length > LIMIT
+        btnMore.style.display = needsMore ? '' : 'none'
+        btnMore.textContent = chipsExpanded ? 'Less' : 'More'
+        if (!btnMore.onclick) {
+          btnMore.onclick = () => { chipsExpanded = !chipsExpanded; void refreshTemplatesUI() }
+        }
+      }
+    }
+    // Paginate for gallery (orderedAll includes built-ins + saved)
+    const totalPages = Math.max(1, Math.ceil(orderedAll.length / PER_PAGE))
+    galleryPage = Math.min(Math.max(1, galleryPage), totalPages)
+    const pageStart = (galleryPage - 1) * PER_PAGE
+    const pageItems = orderedAll.slice(pageStart, pageStart + PER_PAGE)
+    // Render gallery with pin state and delete for saved
+    renderTemplatesGallery(gallery, {
+      templates: pageItems,
+      onStart: (tpl) => { startTemplateWithConfirm(tpl) },
+      onSave: async (tpl) => { await FocusRepository.saveTemplate({ tpl }); showToast('Template saved.'); await refreshTemplatesUI() },
+      pinnedNames: pinned,
+      onTogglePin: async (name: string, nextPinned: boolean) => {
+        const curr = new Set<string>(prefs.pinnedTemplateNames ?? [])
+        if (nextPinned) curr.add(name); else curr.delete(name)
+        const updated: Settings = { ...prefs, pinnedTemplateNames: Array.from(curr) }
+        await FocusRepository.saveSettings({ settings: updated })
+        prefs = updated
+        await refreshTemplatesUI()
+      }
+    })
+    // Render pager
+    pagerHost.innerHTML = `
+      <div class="pager">
+        <button class="btn secondary" data-prev ${galleryPage<=1?'disabled':''}>Prev</button>
+        <span class="pager__info">Page ${galleryPage} / ${totalPages}</span>
+        <button class="btn secondary" data-next ${galleryPage>=totalPages?'disabled':''}>Next</button>
+      </div>`
+    const prev = pagerHost.querySelector<HTMLButtonElement>('button[data-prev]')!
+    const next = pagerHost.querySelector<HTMLButtonElement>('button[data-next]')!
+    prev.onclick = () => { if (galleryPage>1) { galleryPage--; void refreshTemplatesUI() } }
+    next.onclick = () => { if (galleryPage<totalPages) { galleryPage++; void refreshTemplatesUI() } }
+  }
+  await refreshTemplatesUI()
   // Builder
-  bindTemplateBuilder()
+  setupTemplateBuilder()
+  // Enable global shortcuts
+  bindShortcuts()
+  // Desktop window controls
+  if (isDesktop) { await initDesktopWindowControls() }
 }
 
-function buildUI({ settings, tm }: { settings: Settings; tm: TaskManager }) {
+function buildUI({ settings }: { settings: Settings }) {
   const root = document.querySelector<HTMLDivElement>('#app')!
   const container = document.createElement('div')
-  container.className = 'container'
+  container.className = 'frame'
   container.innerHTML = `
-    <div class="header">
+    <div class="header" data-tauri-drag-region="true">
       <div class="brand"><img class="brand__logo" src="/favicon.svg" alt=""/><span class="brand__title">Focus Motive</span></div>
       <div class="settings">
-        <label for="minutes">Minutes</label><input id="minutes" class="input" type="number" min="${appConstants.minSessionMinutes}" max="${appConstants.maxSessionMinutes}" />
-        <button id="gear" class="btn gear" title="Settings">⚙</button>
+        <label for="minutes">Minutes</label><input id="minutes" class="input no-drag" type="number" min="${appConstants.minSessionMinutes}" max="${appConstants.maxSessionMinutes}" />
+        <button id="gear" class="btn gear no-drag" title="Settings">⚙</button>
+        <div class="win-controls no-drag">
+          <button id="win-min" class="btn secondary" title="Minimize" aria-label="Minimize">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="7" width="10" height="2" rx="1" fill="currentColor"/>
+            </svg>
+          </button>
+          <button id="win-max" class="btn secondary" title="Maximize" aria-label="Maximize">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2.5" y="2.5" width="9" height="9" rx="1.2" stroke="currentColor"/>
+            </svg>
+          </button>
+          <button id="win-close" class="btn danger" title="Close" aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
+    <div class="container">
+    <div class="tabs" id="tabs-top">
+      <button class="tab active" data-page="timer">Timer</button>
+      <button class="tab" data-page="templates">Templates</button>
+      <button class="tab" data-page="settings">Settings</button>
+    </div>
+    <div id="view-timer" class="page">
     <div class="card timer">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <div class="timer__display">
+        <div class="now-chip" id="now-chip" hidden></div>
         <div class="time" id="time">00:00</div>
         <div class="circle-wrap" id="circle">
-          <svg width="160" height="160" viewBox="0 0 160 160" aria-hidden="true">
-            <circle class="circle-bg" cx="80" cy="80" r="68" />
-            <circle class="circle-prog" id="circle-prog" cx="80" cy="80" r="68" stroke-dasharray="427" stroke-dashoffset="0" />
+          <svg width="240" height="240" viewBox="0 0 240 240" aria-hidden="true">
+            <circle class="circle-bg" cx="120" cy="120" r="100" />
+            <circle class="circle-prog" id="circle-prog" cx="120" cy="120" r="100" stroke-dasharray="628" stroke-dashoffset="0" />
           </svg>
           <div class="circle-center" id="circle-center">25:00</div>
         </div>
-        <div style="text-align:right;">
-          <div id="block-now" class="task-title"></div>
-          <div id="block-next" class="task-title" style="opacity:.7"></div>
-        </div>
+      </div>
+      <div class="block-labels">
+        <div id="block-now" class="task-title"></div>
+        <div id="block-next" class="task-title" style="opacity:.7"></div>
       </div>
       <div class="controls">
         <button id="start" class="btn">Start</button>
@@ -112,31 +322,43 @@ function buildUI({ settings, tm }: { settings: Settings; tm: TaskManager }) {
         <button id="skip" class="btn secondary">Skip</button>
         <button id="extend" class="btn secondary">+1m</button>
       </div>
+      <div class="chips" id="quick-templates"></div>
+      <div class="chips-actions">
+        <button id="chips-more" class="btn secondary">More</button>
+      </div>
     </div>
     <div class="card tasks">
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input id="new-task" class="input" placeholder="New task..." />
-        <button id="add-task" class="btn">Add</button>
+      <div style="display:flex;justify-content:center;">
+        <button id="manage-templates-bottom" class="btn secondary">Manage Templates</button>
       </div>
-      <div id="task-list"></div>
     </div>
+    </div><!-- /view-timer -->
+    <div class="tabs tabs-bottom" id="tabs-bottom">
+      <button class="tab active" data-page="timer">Timer</button>
+      <button class="tab" data-page="templates">Templates</button>
+      <button class="tab" data-page="settings">Settings</button>
+    </div>
+    <div id="view-templates" class="page">
     <div class="card" id="templates">
       <div style="font-weight:700;margin-bottom:8px;">Templates</div>
       <div id="template-list"></div>
-      <div style="margin-top:12px;border-top:1px solid #1f2937;padding-top:12px;">
-        <div style="font-weight:700;margin-bottom:8px;">New Custom Template</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+          <div style="font-weight:700;margin-bottom:8px;">New Custom Template</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input id="tpl-name" class="input" placeholder="Name" style="width:180px" />
           <input id="tpl-duration" class="input" type="number" min="1" max="180" placeholder="Minutes" style="width:120px" />
           <input id="tpl-repeat" class="input" type="number" min="1" max="12" value="1" style="width:100px" />
           <button id="tpl-save" class="btn">Save Template</button>
-        </div>
-        <div id="tpl-blocks" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
-        <div style="margin-top:8px;display:flex;gap:8px;">
-          <button id="tpl-add" class="btn secondary">Add Block</button>
+          </div>
+          <div id="tpl-blocks" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
+          <div style="margin-top:8px;display:flex;gap:8px;">
+            <button id="tpl-add" class="btn secondary">Add Block</button>
+            <div id="tpl-total" class="task-title" style="margin-top:6px;opacity:.85">Total: 0 min</div>
+          </div>
         </div>
       </div>
-    </div>
+    </div><!-- /view-templates -->
+    <div id="view-settings" class="page">
     <div class="settings-panel" id="settings-panel">
       <div style="font-weight:700;margin-bottom:8px;">Settings</div>
       <div class="settings-row"><span>Theme</span>
@@ -152,264 +374,203 @@ function buildUI({ settings, tm }: { settings: Settings; tm: TaskManager }) {
           <option value="circular">Circular</option>
         </select>
       </div>
+      <div class="settings-row"><span>Timer Size</span>
+        <select id="timer-size" class="select">
+          <option value="s">Small</option>
+          <option value="m">Medium</option>
+          <option value="l">Large</option>
+        </select>
+      </div>
+      <div class="settings-row"><span>Tabs Placement</span>
+        <select id="tabs-placement" class="select">
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+        </select>
+      </div>
       <div class="settings-row"><span>Sound</span>
         <input type="checkbox" id="sound-toggle" class="switch" />
+      </div>
+      <div class="settings-row"><span>Sound Pack</span>
+        <select id="sound-pack" class="select">
+          <option value="beep">Beep</option>
+          <option value="chime">Chime</option>
+        </select>
+      </div>
+      <div class="settings-row"><span>Notifications</span>
+        <input type="checkbox" id="notify-toggle" class="switch" />
+        <button id="notify-test" class="btn secondary" style="margin-left:8px;">Test</button>
       </div>
       <div class="settings-row"><span>Mini Bubble</span>
         <input type="checkbox" id="mini-toggle" class="switch" />
       </div>
-    </div>
+      <div class="settings-row"><span>Mini Transparent</span>
+        <input type="checkbox" id="mini-trans" class="switch" />
+      </div>
+      <div class="settings-row"><span>Pin Templates to Top</span>
+        <input type="checkbox" id="pin-top" class="switch" />
+      </div>
+      <div class="settings-row"><span>Confirm Start</span>
+        <input type="checkbox" id="confirm-start" class="switch" />
+      </div>
+      <div class="settings-row"><span>Countdown (s)</span>
+        <input id="countdown-sec" class="input" type="number" min="0" max="10" style="width:90px" />
+      </div>
+      <div style="font-weight:700;margin:12px 0 6px;">Shortcuts</div>
+      <div class="settings-row"><span>Start/Pause</span>
+        <input id="sc-startpause" class="input" placeholder="e.g., Space" style="width:140px" />
+      </div>
+      <div class="settings-row"><span>Timer Tab</span>
+        <input id="sc-tab-timer" class="input" placeholder="e.g., T" style="width:140px" />
+      </div>
+      <div class="settings-row"><span>Templates Tab</span>
+        <input id="sc-tab-templates" class="input" placeholder="e.g., E" style="width:140px" />
+      </div>
+      <div class="settings-row"><span>Settings Tab</span>
+        <input id="sc-tab-settings" class="input" placeholder="e.g., S" style="width:140px" />
+      </div>
+      <div class="settings-row"><span>Shortcuts Help</span>
+        <input id="sc-help" class="input" placeholder="e.g., ?" style="width:140px" />
+      </div>
+      <div style="font-weight:700;margin:12px 0 6px;">Window</div>
+      <div class="settings-row"><span>Glass Effect</span>
+        <select id="glass-effect" class="select">
+          <option value="off">Off</option>
+          <option value="acrylic">Acrylic</option>
+        </select>
+      </div>
+      <div class="settings-row"><span>Header Density</span>
+        <select id="header-density" class="select">
+          <option value="normal">Normal</option>
+          <option value="compact">Compact</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </div>
+      <div class="settings-row"><span>Frame Radius</span>
+        <input id="frame-radius" class="input" type="number" min="4" max="28" style="width:90px" />
+      </div>
+      <div class="settings-row"><span>Shadow Strength</span>
+        <select id="frame-shadow" class="select">
+          <option value="off">Off</option>
+          <option value="light">Light</option>
+          <option value="medium">Medium</option>
+          <option value="strong">Strong</option>
+        </select>
+      </div>
+      <div class="settings-row"><span>Accent Preset</span>
+        <select id="accent-preset" class="select">
+          <option value="default">Default</option>
+          <option value="ocean">Ocean</option>
+          <option value="violet">Violet</option>
+          <option value="sunset">Sunset</option>
+        </select>
+      </div>
+      <div class="settings-row"><span>Compact Header</span>
+        <input type="checkbox" id="compact-header" class="switch" />
+      </div><!-- /view-settings -->
+      <div class="settings-row"><span>Install</span>
+        <button id="btn-install" class="btn secondary" style="display:none;">Install App</button>
+      </div>
+    </div><!-- /.container -->
   `
   root.appendChild(container)
-  const elTime = container.querySelector<HTMLDivElement>('#time')!
   const elMinutes = container.querySelector<HTMLInputElement>('#minutes')!
-  const elStart = container.querySelector<HTMLButtonElement>('#start')!
-  const elPause = container.querySelector<HTMLButtonElement>('#pause')!
-  const elReset = container.querySelector<HTMLButtonElement>('#reset')!
-  const elSkip = container.querySelector<HTMLButtonElement>('#skip')!
-  const elExtend = container.querySelector<HTMLButtonElement>('#extend')!
-  const elBlockNow = container.querySelector<HTMLDivElement>('#block-now')!
-  const elBlockNext = container.querySelector<HTMLDivElement>('#block-next')!
-  const elNewTask = container.querySelector<HTMLInputElement>('#new-task')!
-  const elAddTask = container.querySelector<HTMLButtonElement>('#add-task')!
-  const elTaskList = container.querySelector<HTMLDivElement>('#task-list')!
+  // tasks removed
   const elGear = container.querySelector<HTMLButtonElement>('#gear')!
   const panel = container.querySelector<HTMLDivElement>('#settings-panel')!
-  const selTheme = container.querySelector<HTMLSelectElement>('#theme')!
-  const selMode = container.querySelector<HTMLSelectElement>('#timer-mode')!
-  const chkMini = container.querySelector<HTMLInputElement>('#mini-toggle')!
-  const chkSound = container.querySelector<HTMLInputElement>('#sound-toggle')!
-  const circleWrap = container.querySelector<HTMLDivElement>('#circle')!
-  const circleProg = container.querySelector<SVGCircleElement>('#circle-prog')!
-  const circleCenter = container.querySelector<HTMLDivElement>('#circle-center')!
-  const elMini = document.querySelector<HTMLDivElement>('#mini')!
-  const elMiniTime = document.querySelector<HTMLSpanElement>('#mini-time')!
-  elMinutes.value = String(settings.sessionMinutes)
-  // hydrate settings
-  document.documentElement.setAttribute('data-theme', settings.theme ?? 'dark')
-  selTheme.value = settings.theme ?? 'dark'
-  selMode.value = settings.timerMode ?? 'digital'
-  chkMini.checked = Boolean(settings.miniWindowEnabled)
-  chkSound.checked = Boolean(settings.soundEnabled)
-  const totalCircumference = 2 * Math.PI * 68
-  circleProg.setAttribute('stroke-dasharray', String(totalCircumference))
-  const setTime = (ms: number): void => {
-    const t = toTime(ms)
-    elTime.textContent = t
-    circleCenter.textContent = t
-    if (elMini) elMiniTime.textContent = t
-    try { localStorage.setItem('cadence_tick', String(ms)) } catch {}
-    const emitFn = (window as unknown as { __emitTick?: (e: string, p?: unknown) => Promise<void> }).__emitTick
-    if (emitFn) { emitFn('cadence:tick', { ms }).catch(() => {}) }
-    const totalMs = Number(circleWrap.dataset.totalms || '0')
-    if (totalMs > 0) {
-      const progress = Math.min(1, Math.max(0, 1 - ms / totalMs))
-      const offset = totalCircumference * progress
-      circleProg.setAttribute('stroke-dashoffset', String(offset))
-    }
-  }
-  const onStart = (cb: () => void): void => { elStart.onclick = () => cb() }
-  const onPause = (cb: () => void): void => { elPause.onclick = () => cb() }
-  const onReset = (cb: (mins: number) => void): void => { elReset.onclick = () => cb(sanitizeMinutes(elMinutes.value)) }
-  elSkip.onclick = () => { (window as unknown as { __engine?: ScheduleEngine }).__engine?.skip() }
-  elExtend.onclick = () => { (window as unknown as { __engine?: ScheduleEngine }).__engine?.extend({ minutes: 1 }) }
-  const setBlockLabels = (now: string | null, next: string | null): void => {
-    elBlockNow.textContent = now ? `Now: ${now}` : ''
-    elBlockNext.textContent = next ? `Next: ${next}` : ''
-  }
-  // toggle settings panel
-  elGear.onclick = () => panel.classList.toggle('show')
-  selTheme.onchange = async () => {
-    document.documentElement.setAttribute('data-theme', selTheme.value)
-    await FocusRepository.saveSettings({ settings: { ...settings, theme: selTheme.value as 'dark'|'light'|'amoled' } })
-  }
-  selMode.onchange = async () => {
-    const mode = selMode.value as 'digital'|'circular'
-    circleWrap.classList.toggle('show', mode === 'circular')
-    await FocusRepository.saveSettings({ settings: { ...settings, timerMode: mode } })
-  }
-  chkMini.onchange = async () => {
-    const enabled = chkMini.checked
-    elMini.classList.toggle('show', enabled)
-    await FocusRepository.saveSettings({ settings: { ...settings, miniWindowEnabled: enabled } })
-    try {
-      // Desktop mini window management
-      const isDesktop = Boolean((window as unknown as { __TAURI__?: unknown }).__TAURI__)
-      if (isDesktop) {
-        const mod = await import('@tauri-apps/api/webviewWindow') as unknown as { WebviewWindow: any }
-        const WebviewWindow: any = (mod as any).WebviewWindow
-        const existing = WebviewWindow.getByLabel ? WebviewWindow.getByLabel('mini') : undefined
-        if (enabled) {
-          if (!existing) new WebviewWindow('mini', { width: 240, height: 90, decorations: false, resizable: false, alwaysOnTop: true, url: '/?mini=1' })
-        } else {
-          if (existing) existing.close()
-        }
-      }
-    } catch {}
-  }
-  chkSound.onchange = async () => { await FocusRepository.saveSettings({ settings: { ...settings, soundEnabled: chkSound.checked } }) }
-  // reveal circle if selected
-  circleWrap.classList.toggle('show', (settings.timerMode ?? 'digital') === 'circular')
-  const onAdd = async (): Promise<void> => {
-    const title = elNewTask.value.trim()
-    if (!title) return
-    const { task } = await tm.add({ title })
-    renderTasks([task], true)
-    elNewTask.value = ''
-  }
-  elAddTask.onclick = () => { onAdd() }
-  elNewTask.onkeydown = (e) => { if (e.key === 'Enter') onAdd() }
-  const renderTasks = (list: readonly Task[], append: boolean = false): void => {
-    if (!append) elTaskList.innerHTML = ''
-    list.forEach((t) => {
-      const row = document.createElement('div')
-      row.className = 'task-row'
-      row.innerHTML = `
-        <input type="checkbox" ${t.done ? 'checked' : ''} />
-        <div class="task-title ${t.done ? 'done' : ''}">${escapeHtml(t.title)}</div>
-        <button class="btn secondary" data-rm="1">Remove</button>
-      `
-      const cb = row.querySelector<HTMLInputElement>('input')!
-      cb.onchange = async () => { await tm.toggle({ id: t.id }); row.querySelector('.task-title')!.classList.toggle('done') }
-      const rm = row.querySelector<HTMLButtonElement>('button[data-rm="1"]')!
-      rm.onclick = async () => { const { removed } = await tm.remove({ id: t.id }); if (removed) row.remove() }
-      elTaskList.appendChild(row)
-    })
-  }
-  ;(window as unknown as { __engine?: ScheduleEngine }).__engine = undefined
-  const setTotal = (ms: number): void => { circleWrap.dataset.totalms = String(ms) }
-  return { setTime, onStart, onPause, onReset, renderTasks, setBlockLabels, setTotal }
-}
-
-function renderTemplatesGallery(host: HTMLDivElement, handlers: { onStart: (tpl: SessionTemplate) => void; onSave: (tpl: SessionTemplate) => Promise<void> }): void {
-  const list = host.querySelector<HTMLDivElement>('#template-list')!
-  list.innerHTML = ''
-  builtInTemplates.forEach((tpl: SessionTemplate) => {
-    const row = document.createElement('div')
-    row.className = 'task-row'
-    const total = totalMinutes(tpl)
-    row.innerHTML = `
-      <div style="flex:1;display:flex;gap:8px;align-items:center;">
-        <div style="font-weight:600;">${escapeHtml(tpl.name)}</div>
-        <div class="task-title">${total} min</div>
-      </div>
-      <div class="controls">
-        <button class="btn" data-tpl-start>Start</button>
-        <button class="btn secondary" data-tpl-save>Save</button>
-      </div>`
-    const start = row.querySelector<HTMLButtonElement>('button[data-tpl-start]')!
-    const save = row.querySelector<HTMLButtonElement>('button[data-tpl-save]')!
-    start.onclick = () => handlers.onStart(tpl)
-    save.onclick = async () => { await handlers.onSave(tpl) }
-    list.appendChild(row)
+  // Tabs wiring (top and bottom toolbars)
+  const tabs = setupTabs(container, {
+    panel,
+    current: () => current,
+    save: async (next) => { current = next; await FocusRepository.saveSettings({ settings: current }); if (onPrefs) onPrefs(current) }
   })
-}
-
-function bindTemplateBuilder(): void {
-  const nameEl = document.querySelector<HTMLInputElement>('#tpl-name')!
-  const durEl = document.querySelector<HTMLInputElement>('#tpl-duration')!
-  const repEl = document.querySelector<HTMLInputElement>('#tpl-repeat')!
-  const btnSave = document.querySelector<HTMLButtonElement>('#tpl-save')!
-  const btnAdd = document.querySelector<HTMLButtonElement>('#tpl-add')!
-  const list = document.querySelector<HTMLDivElement>('#tpl-blocks')!
-  let blocks: SessionBlock[] = []
-
-  const clamp = (n: number, min: number, max: number): number => Math.max(min, Math.min(max, n))
-
-  const render = (): void => {
-    list.innerHTML = ''
-    blocks.forEach((b, i) => {
-      const row = document.createElement('div')
-      row.className = 'task-row'
-      row.style.alignItems = 'center'
-      row.innerHTML = `
-        <input class="blk-mins" type="number" min="1" max="180" value="${b.durationMinutes}" style="width:90px" />
-        <input class="blk-label input" placeholder="Label" value="${escapeHtml(b.label)}" style="flex:1" />
-        <select class="blk-type select">
-          <option value="focus" ${b.type==='focus'?'selected':''}>Focus</option>
-          <option value="break" ${b.type==='break'?'selected':''}>Break</option>
-          <option value="meditation" ${b.type==='meditation'?'selected':''}>Meditation</option>
-          <option value="workout" ${b.type==='workout'?'selected':''}>Workout</option>
-          <option value="rest" ${b.type==='rest'?'selected':''}>Rest</option>
-          <option value="custom" ${b.type==='custom'?'selected':''}>Custom</option>
-        </select>
-        <button class="btn secondary" data-up>↑</button>
-        <button class="btn secondary" data-down>↓</button>
-        <button class="btn secondary" data-del>Remove</button>
-      `
-      const mins = row.querySelector<HTMLInputElement>('.blk-mins')!
-      const label = row.querySelector<HTMLInputElement>('.blk-label')!
-      const type = row.querySelector<HTMLSelectElement>('.blk-type')!
-      mins.onchange = () => { blocks[i] = { ...blocks[i], durationMinutes: clamp(Math.floor(Number(mins.value)||1), 1, 180) } }
-      label.oninput = () => { blocks[i] = { ...blocks[i], label: label.value } }
-      type.onchange = () => { blocks[i] = { ...blocks[i], type: type.value as SessionBlock['type'] } }
-      row.querySelector<HTMLButtonElement>('[data-up]')!.onclick = () => { if (i>0) { const t=blocks[i-1]; blocks[i-1]=blocks[i]; blocks[i]=t; render() } }
-      row.querySelector<HTMLButtonElement>('[data-down]')!.onclick = () => { if (i<blocks.length-1) { const t=blocks[i+1]; blocks[i+1]=blocks[i]; blocks[i]=t; render() } }
-      row.querySelector<HTMLButtonElement>('[data-del]')!.onclick = () => { blocks = blocks.filter((_,j)=>j!==i); render() }
-      list.appendChild(row)
-    })
-  }
-
-  btnAdd.onclick = () => { blocks = [...blocks, { label: 'Block', durationMinutes: clamp(Math.floor(Number(durEl.value)||5),1,180), type: 'custom' }]; render() }
-
-  btnSave.onclick = async () => {
-    const name = nameEl.value.trim()
-    const repeat = clamp(Math.floor(Number(repEl.value)||1), 1, 12)
-    let outBlocks = blocks
-    if (outBlocks.length === 0) {
-      const mins = clamp(Math.floor(Number(durEl.value)||0), 1, 180)
-      if (!name || !mins) return
-      outBlocks = [{ label: 'Block', durationMinutes: mins, type: 'custom' }]
-    } else if (!name) {
-      return
+  const switchTo = (page: 'timer'|'templates'|'settings'): void => tabs.switchTo(page)
+  // Manage Templates button (bottom card)
+  const btnManage = container.querySelector<HTMLButtonElement>('#manage-templates-bottom')
+  if (btnManage) btnManage.onclick = () => switchTo('templates')
+  const timerUi = setupTimerCard(container)
+  // mini bubble handled via settings panel + timer card; no direct refs here
+  // local mutable copy of settings inside UI
+  let current: Settings = { ...settings }
+  let onPrefs: ((s: Settings) => void) | undefined
+  elMinutes.value = String(current.sessionMinutes)
+  // Delegate settings hydration and handlers to settings-panel
+  setupSettingsPanel(container, {
+    initial: current,
+    onChange: (s) => {
+      current = s
+      timerUi.setMode(s.timerMode ?? 'digital')
+      timerUi.setTimerSize(s.timerSize ?? 'l')
+      if (onPrefs) onPrefs(current)
+      tabs.applyTabsPlacement()
     }
-    const tpl: SessionTemplate = { id: crypto.randomUUID(), name, blocks: outBlocks, repeat }
-    await FocusRepository.saveTemplate({ tpl })
-    showToast('Template saved.')
-    nameEl.value = ''
-    durEl.value = ''
-    repEl.value = '1'
-    blocks = []
-    render()
-  }
-
-  render()
+  })
+  timerUi.setMode(current.timerMode ?? 'digital')
+  timerUi.setTimerSize(current.timerSize ?? 'l')
+  tabs.applyTabsPlacement()
+  // Initialize to last active tab (persisted)
+  switchTo(((current.activeTab as ('timer'|'templates'|'settings')) ?? 'timer'))
+  const setTime = (ms: number): void => timerUi.setTime(ms)
+  const onStart = (cb: () => void): void => timerUi.onStart(cb)
+  const onPause = (cb: () => void): void => timerUi.onPause(cb)
+  const onReset = (cb: (mins: number) => void): void => timerUi.onReset(cb)
+  const onSkip = (cb: () => void): void => timerUi.onSkip(cb)
+  const onExtend = (cb: (minutes: number) => void): void => timerUi.onExtend(cb)
+  const setBlockLabels = (now: string | null, next: string | null, type?: SessionBlock['type']): void => timerUi.setBlockLabels(now, next, type)
+  const setTransport = (state: 'idle'|'running'|'paused'): void => timerUi.setTransport(state)
+  const pulseBlock = (): void => timerUi.pulseBlock()
+  // gear opens Settings tab
+  elGear.onclick = () => switchTo('settings')
+  // settings change handlers are in settings-panel; only tabs placement resize is here
+  window.addEventListener('resize', tabs.applyTabsPlacement)
+  // engine state is managed by controller; no global assignment
+  const setTotal = (ms: number): void => { timerUi.setTotal(ms) }
+  // expose settings change listener to outer scope
+  const onPrefsChanged = (cb: (s: Settings) => void): void => { onPrefs = cb }
+  return { setTime, onStart, onPause, onReset, onSkip, onExtend, setBlockLabels, setTotal, onPrefsChanged, setTransport, pulseBlock }
 }
 
-function totalMinutes(tpl: { blocks: readonly { durationMinutes: number }[]; repeat?: number }): number {
-  const per = tpl.blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-  return Math.round(per * (tpl.repeat ?? 1))
-}
 
-function setAccent(type: 'focus'|'break'|'meditation'|'workout'|'rest'|'custom'): void {
-  const map: Record<string,string> = { focus: '#38bdf8', break: '#22c55e', meditation: '#a855f7', workout: '#f59e0b', rest: '#14b8a6', custom: '#60a5fa' }
-  document.documentElement.style.setProperty('--accent', map[type] ?? '#38bdf8')
-}
 
-function beep(freq: number, ms: number): void {
-  const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
-  const o = ctx.createOscillator()
-  const g = ctx.createGain()
-  o.type = 'sine'
-  o.frequency.value = freq
-  o.connect(g); g.connect(ctx.destination)
-  g.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + ms / 1000)
-  o.start(); o.stop(ctx.currentTime + ms / 1000)
-}
+// audio helpers moved to services/audio and are used inside engine-controller
 
 function renderMini(): void {
   const root = document.querySelector<HTMLDivElement>('#app')!
   root.innerHTML = ''
+  // make background transparent for Tauri transparent windows
+  try { document.body.style.background = 'transparent' } catch {}
   const box = document.createElement('div')
   box.id = 'mini-standalone'
-  box.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-weight:700;font-size:28px;padding:8px;'
+  box.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-weight:700;font-size:28px;padding:8px;'
   box.setAttribute('data-tauri-drag-region', 'true')
   root.appendChild(box)
-  const update = (ms: number): void => { box.textContent = toTime(ms) }
+  const close = document.createElement('button')
+  close.textContent = '×'
+  close.title = 'Close'
+  close.style.cssText = 'position:absolute;top:6px;right:6px;font-size:14px;line-height:14px;padding:4px 8px;border:none;border-radius:6px;background:rgba(0,0,0,0.25);color:#fff;cursor:pointer;'
+  close.setAttribute('data-tauri-drag-region', 'false')
+  close.onclick = async () => {
+    if (Platform.isDesktop) {
+      try {
+        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow') as typeof import('@tauri-apps/api/webviewWindow')
+        const w = WebviewWindow.getByLabel ? WebviewWindow.getByLabel('mini') : undefined
+        if (w) await w.close()
+      } catch {}
+    } else {
+      try {
+        const { FocusRepository } = await import('./data/focus-repository')
+        const { settings } = await FocusRepository.loadSettings(defaults)
+        await FocusRepository.saveSettings({ settings: { ...settings, miniWindowEnabled: false } })
+      } catch {}
+    }
+  }
+  box.appendChild(close)
+  const timeEl = document.createElement('div')
+  timeEl.style.cssText = 'pointer-events:none;'
+  box.appendChild(timeEl)
+  const update = (ms: number): void => { timeEl.textContent = Time.toTime(ms) }
   try { const ms = Number(localStorage.getItem('cadence_tick') || '0'); if (ms) update(ms) } catch {}
   window.addEventListener('storage', (e) => { if (e.key === 'cadence_tick' && e.newValue) update(Number(e.newValue)) })
-  const isDesktop = Boolean((window as unknown as { __TAURI__?: unknown }).__TAURI__)
-  if (isDesktop) {
+  if (Platform.isDesktop) {
     try {
       // dynamic import to avoid bundling for web
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -424,13 +585,8 @@ function renderMini(): void {
   }
 }
 
-function escapeHtml(s: string): string {
-  return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
-}
+// escapeHtml moved to ./ui/templates-utils
 
-function sanitizeMinutes(raw: string): number {
-  const n = Math.max(appConstants.minSessionMinutes, Math.min(appConstants.maxSessionMinutes, Math.floor(Number(raw) || appConstants.defaultSessionMinutes)))
-  return n
-}
+// sanitizeMinutes moved to timer-card
 
-main().catch((e) => console.error(e))
+// overlays moved to ./ui/overlays

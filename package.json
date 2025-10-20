@@ -10,13 +10,18 @@
   "engines": { "node": ">=18.0.0" },
   "scripts": {
     "dev:web": "npm --workspace apps/web run dev",
+    "dev:web-svelte": "npm --workspace apps/web-svelte run dev",
     "dev:desktop": "npm --workspace apps/desktop run tauri dev",
     "dev:all": "concurrently \"npm --workspace apps/web run dev\" \"npm --workspace apps/desktop run tauri dev\"",
+    "dev:all-svelte": "concurrently \"npm --workspace apps/web-svelte run dev\" \"npm --workspace apps/desktop run tauri dev\"",
     "dev:desktop:vs": "tooling\\scripts\\dev-desktop-vs.cmd",
     "dev:all:vs": "concurrently \"npm --workspace apps/web run dev\" \"tooling\\scripts\\dev-desktop-vs.cmd\"",
+    "dev:all-svelte:vs": "concurrently \"npm --workspace apps/web-svelte run dev\" \"tooling\\scripts\\dev-desktop-vs.cmd\"",
     "build:web": "npm --workspace apps/web run build",
+    "build:web-svelte": "npm --workspace apps/web-svelte run build",
     "preview:web": "npm --workspace apps/web run preview",
-    "typecheck": "npm -ws run typecheck",
+    "preview:web-svelte": "npm --workspace apps/web-svelte run preview",
+    "typecheck": "npm --workspace apps/web run typecheck",
     "tauri": "npm --workspace apps/desktop run tauri"
   },
   "devDependencies": {

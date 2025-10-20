@@ -90,4 +90,12 @@ export class FocusRepository {
     const all = await Promise.all(keys.map((k: string) => db.get('templates', k)))
     return { templates: (all.filter(Boolean) as SessionTemplate[]) }
   }
+
+  static async removeTemplate({ id }: { id: string }): Promise<{ removed: boolean }> {
+    const db = await this.open()
+    const exists = await db.get('templates', id)
+    if (!exists) return { removed: false }
+    await db.delete('templates', id)
+    return { removed: true }
+  }
 }

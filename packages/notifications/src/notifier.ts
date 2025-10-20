@@ -11,7 +11,7 @@ export async function notify({ title, body }: NotifyInput): Promise<boolean> {
   const isDesktop = Boolean((window as unknown as { __TAURI__?: unknown }).__TAURI__)
   if (isDesktop) {
     try {
-      const api = await import('@tauri-apps/api/notification') as typeof import('@tauri-apps/api/notification')
+      const api = await import('@tauri-apps/plugin-notification') as typeof import('@tauri-apps/plugin-notification')
       if (!(await api.isPermissionGranted())) {
         const res = await api.requestPermission()
         if (res !== 'granted') return false

@@ -1,0 +1,10 @@
+{
+  "name": "@cadence/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cadence UI tokens and helpers",
+  "exports": {
+    "./tokens.css": "./src/tokens.css"
+  }
+}

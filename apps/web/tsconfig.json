@@ -19,7 +19,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "useDefineForClassFields": true,
-    "types": [],
+    "types": ["vitest", "node"],
     "paths": {
       "@cadence/core-domain/*": ["../../packages/core-domain/src/*"],
       "@cadence/storage/*": ["../../packages/storage/src/*"],
