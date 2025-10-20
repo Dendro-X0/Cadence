@@ -1,4 +1,4 @@
-import type { SessionBlock, SessionTemplate } from '@cadence/core-domain/session-template'
+import type { SessionBlock } from '@cadence/core-domain/session-template'
 
 export function totalMinutes(tpl: { blocks: readonly { durationMinutes: number }[]; repeat?: number }): number {
   const per = tpl.blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
