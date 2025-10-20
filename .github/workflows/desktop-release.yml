@@ -45,7 +45,7 @@ jobs:
             apps/desktop/src-tauri
 
       - name: Build and Release (Tauri)
-        uses: tauri-apps/tauri-action@v2
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Optional signing secrets
@@ -59,4 +59,4 @@ jobs:
           releaseBody: |
             Automated desktop release built by CI.
             - Windows and macOS installers attached.
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
