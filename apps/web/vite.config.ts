@@ -1,62 +1,48 @@
 import { defineConfig } from 'vite'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+import tsconfigPaths from 'vite-tsconfig-paths'
 import { VitePWA } from 'vite-plugin-pwa'
-import { fileURLToPath } from 'node:url'
-
-const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365
-const r = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 
 export default defineConfig({
-  clearScreen: false,
-  server: {
-    host: '127.0.0.1',
-    port: 5173,
-    strictPort: true
-  },
-  resolve: {
-    alias: {
-      '@cadence/core-domain': r('../../packages/core-domain/src'),
-      '@cadence/storage': r('../../packages/storage/src'),
-      '@cadence/templates': r('../../packages/templates/src'),
-      '@cadence/notifications': r('../../packages/notifications/src')
-    }
-  },
   plugins: [
+    tsconfigPaths(),
+    svelte(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'offline.html'],
       manifest: {
-        name: 'Focus Motive',
-        short_name: 'FM',
-        description: 'Lightweight cross-platform focus and motivation PWA',
-        theme_color: '#0ea5e9',
-        background_color: '#0b1020',
-        display: 'standalone',
+        name: 'Cadence',
+        short_name: 'Cadence',
         start_url: '/',
-        lang: 'en',
-        orientation: 'portrait',
-        icons: []
+        display: 'standalone',
+        background_color: '#0b1020',
+        theme_color: '#0ea5e9',
+        icons: [
+          { src: 'favicon.svg', sizes: '64x64', type: 'image/svg+xml' }
+        ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        navigateFallback: 'index.html',
+        navigateFallback: 'offline.html',
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*$/i,
-            handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'google-fonts-stylesheets' }
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'CacheFirst',
+            options: { cacheName: 'images', expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 7 } }
           },
           {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*$/i,
+            urlPattern: ({ request }) => request.destination === 'font',
             handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-webfonts',
-              cacheableResponse: { statuses: [0, 200] },
-              expiration: { maxEntries: 30, maxAgeSeconds: ONE_YEAR_SECONDS }
-            }
+            options: { cacheName: 'fonts', expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 } }
+          },
+          {
+            urlPattern: ({ request }) => request.destination === 'audio',
+            handler: 'CacheFirst',
+            options: { cacheName: 'audio', expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 } }
           }
         ]
       }
     })
-  ]
+  ],
+  server: { port: 5174, strictPort: true, host: '127.0.0.1' }
 })

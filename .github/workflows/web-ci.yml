@@ -28,7 +28,7 @@ jobs:
         run: pnpm -w install --frozen-lockfile
 
       - name: Build web app
-        run: pnpm -C apps/web-svelte build
+        run: pnpm -C apps/web build
 
       - name: Test (if present)
-        run: pnpm -C apps/web-svelte test --if-present
+        run: pnpm -C apps/web test --if-present

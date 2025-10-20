@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.cadence.app",
   "build": {
-    "frontendDist": "../../apps/web-svelte/dist",
+    "frontendDist": "../../apps/web/dist",
     "devUrl": "http://127.0.0.1:5174",
-    "beforeDevCommand": "npm --prefix ../../apps/web-svelte run dev",
-    "beforeBuildCommand": "npm --prefix ../../apps/web-svelte run build"
+    "beforeDevCommand": "pnpm -C ../../apps/web dev",
+    "beforeBuildCommand": "pnpm -C ../../apps/web build"
   },
   "app": {
     "windows": [],

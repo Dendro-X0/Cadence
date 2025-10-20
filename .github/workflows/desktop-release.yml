@@ -33,7 +33,7 @@ jobs:
         run: pnpm -w install --frozen-lockfile
 
       - name: Build web frontend
-        run: pnpm -C apps/web-svelte build
+        run: pnpm -C apps/web build
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
