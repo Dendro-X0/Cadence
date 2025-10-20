@@ -1,0 +1,48 @@
+name: Desktop Build (dry-run)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build installers (no release)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies (workspace)
+        run: npm install
+
+      - name: Build web frontend
+        run: npm --prefix apps/web run build
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/desktop/src-tauri
+
+      - name: Build desktop (Tauri)
+        run: npm --prefix apps/desktop run build
+
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-bundles-${{ matrix.os }}
+          path: |
+            apps/desktop/src-tauri/target/**/bundle/**
+          if-no-files-found: warn

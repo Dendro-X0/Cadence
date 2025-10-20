@@ -6,11 +6,14 @@
   const dispatch = createEventDispatcher<{ close: void }>()
 
   function close(): void { dispatch('close') }
-  function handleKey(e: KeyboardEvent): void { if (e.key === 'Escape' || e.key === 'Enter') close() }
+  function handleKey(e: KeyboardEvent): void { if (!visible) return; if (e.key === 'Escape' || e.key === 'Enter') close() }
 </script>
 
+<svelte:window on:keydown={handleKey} />
+
 {#if visible}
-  <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" on:click={close} tabindex="-1" on:keydown={handleKey}>
+  <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+    <button type="button" class="backdrop" aria-label="Close shortcuts" on:click={close} />
     <div class="card" role="document" on:click|stopPropagation>
       <div id="shortcuts-title" class="title">Keyboard Shortcuts</div>
       <ul>
@@ -26,8 +29,9 @@
 {/if}
 
 <style>
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000}
-  .card{background:#111827;border:1px solid #1f2937;border-radius:16px;padding:16px;min-width:280px;color:#e2e8f0}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000}
+  .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45);border:0;padding:0;margin:0;cursor:default}
+  .card{background:#111827;border:1px solid #1f2937;border-radius:16px;padding:16px;min-width:280px;color:#e2e8f0;position:relative;z-index:1}
   .title{font-weight:800;margin-bottom:8px}
   ul{list-style:none;padding:0;margin:0 0 12px 0;display:flex;flex-direction:column;gap:6px}
   li{display:flex;align-items:center;justify-content:space-between;gap:12px}
