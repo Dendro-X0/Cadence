@@ -13,9 +13,10 @@ export type OverlaysState = {
   readonly confirmRepeat?: number
   readonly updateVisible?: boolean
   readonly updateMessage?: string
+  readonly getappVisible?: boolean
 }
 
-const initial: OverlaysState = { countdownVisible: false, countdownSeconds: 3, shortcutsVisible: false, confirmVisible: false, updateVisible: false, updateMessage: undefined }
+const initial: OverlaysState = { countdownVisible: false, countdownSeconds: 3, shortcutsVisible: false, confirmVisible: false, updateVisible: false, updateMessage: undefined, getappVisible: false }
 export const overlays: Writable<OverlaysState> = writable(initial)
 
 export async function showCountdown(seconds: number): Promise<void> {
@@ -38,6 +39,10 @@ export function toggleShortcuts(): void {
 }
 
 export function hideShortcuts(): void { overlays.update((o) => ({ ...o, shortcutsVisible: false })) }
+
+// Get App overlay
+export function toggleGetApp(): void { overlays.update((o) => ({ ...o, getappVisible: !o.getappVisible })) }
+export function hideGetApp(): void { overlays.update((o) => ({ ...o, getappVisible: false })) }
 
 // Confirm overlay
 let confirmResolver: ((ok: boolean) => void) | null = null

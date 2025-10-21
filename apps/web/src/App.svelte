@@ -12,19 +12,26 @@
   import ShortcutsOverlay from './components/overlays/shortcuts.svelte'
   import ConfirmOverlay from './components/overlays/confirm.svelte'
   import UpdateToast from './components/overlays/update-toast.svelte'
-  import { overlays, hideShortcuts, toggleShortcuts } from './stores/overlays'
+  import GetAppOverlay from './components/overlays/get-app.svelte'
+  import { overlays, hideShortcuts, toggleShortcuts, hideGetApp } from './stores/overlays'
+  import { route, initRouterFromUrl, switchTo, type Page } from './stores/router'
 
   let active: 'timer'|'templates'|'settings'|'shortcuts' = 'timer'
+  $: active = $route as any
   let isMobile: boolean = false
   function onTabChange(page: 'timer'|'templates'|'settings'|'shortcuts'): void {
     if (isMobile && page === 'shortcuts') return
-    active = page
+    if (page === 'shortcuts') { active = 'shortcuts' }
+    else switchTo(page as Page)
   }
 
   onMount(async () => {
     const s = await loadSettings()
     document.documentElement.setAttribute('data-theme', s.theme ?? 'dark')
     await initEngine()
+
+    // Initialize router from URL (?tab=...)
+    initRouterFromUrl()
 
     function parseShortcut(spec?: string | null): (e: KeyboardEvent) => boolean {
       const raw = (spec ?? '').trim()
@@ -79,10 +86,10 @@
     const handler = (e: KeyboardEvent): void => {
       if (onHelp(e)) { e.preventDefault(); toggleShortcuts(); return }
       const typing = isTextEditingTarget(e)
-      if (!typing && onTimer(e)) { e.preventDefault(); active = 'timer'; hideShortcuts(); return }
-      if (!typing && onTemplates(e)) { e.preventDefault(); active = 'templates'; hideShortcuts(); return }
-      if (!typing && onSettings(e)) { e.preventDefault(); active = 'settings'; hideShortcuts(); return }
-      if (!typing && onShortcuts(e)) { e.preventDefault(); active = isMobile ? 'settings' : 'shortcuts'; hideShortcuts(); return }
+      if (!typing && onTimer(e)) { e.preventDefault(); switchTo('timer'); hideShortcuts(); return }
+      if (!typing && onTemplates(e)) { e.preventDefault(); switchTo('templates'); hideShortcuts(); return }
+      if (!typing && onSettings(e)) { e.preventDefault(); switchTo('settings'); hideShortcuts(); return }
+      if (!typing && onShortcuts(e)) { e.preventDefault(); active = isMobile ? 'settings' : 'shortcuts'; if (active !== 'shortcuts') switchTo('settings'); hideShortcuts(); return }
       if (onStartPause(e)) {
         e.preventDefault()
         const ev = new CustomEvent('cadence:startpause')
@@ -132,6 +139,7 @@
 <ShortcutsOverlay visible={$overlays.shortcutsVisible} on:close={() => hideShortcuts()} />
 <ConfirmOverlay visible={$overlays.confirmVisible} />
 <UpdateToast visible={$overlays.updateVisible} />
+<GetAppOverlay visible={$overlays.getappVisible} on:close={() => hideGetApp()} />
 </div>
 
 <style>
