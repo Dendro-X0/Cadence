@@ -14,7 +14,7 @@
 {#if visible}
   <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
     <button type="button" class="backdrop" aria-label="Close shortcuts" on:click={close} />
-    <div class="card" role="document" on:click|stopPropagation>
+    <div class="card" role="document">
       <div id="shortcuts-title" class="title">Keyboard Shortcuts</div>
       <ul>
         <li><span>Start/Pause</span><kbd>{$settings.shortcutStartPause ?? 'Space'}</kbd></li>
