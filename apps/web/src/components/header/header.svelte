@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import WindowControls from './window-controls.svelte'
-  import { toggleGetApp } from '../../stores/overlays'
+  import { switchTo } from '../../stores/router'
 
   let canToggle: boolean = false
   let toggleMaxRestore: () => Promise<void> = async () => {}
@@ -44,7 +44,7 @@
   <div class="spacer"></div>
   <div class="no-drag" data-tauri-drag-region="false">
     {#if showGetApp}
-      <button class="getapp" type="button" on:click={() => toggleGetApp()}>Get App</button>
+      <button class="getapp" type="button" on:click={() => switchTo('getapp')}>Get App</button>
     {/if}
     <WindowControls />
   </div>

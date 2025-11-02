@@ -52,12 +52,18 @@ npm install
 npm --workspace apps/web run dev
 ```
 
+- The dev server binds to `0.0.0.0` so you can test on other devices via your LAN IP.
+- In dev, the PWA service worker is emulated; full offline behavior is guaranteed in a production build.
+
 3) Preview a production build locally:
 
 ```bash
 npm --workspace apps/web run build
 npm --workspace apps/web run preview
 ```
+
+- Use this preview to validate offline: open the preview URL, switch DevTools → Network → Offline, then reload.
+- You should see the app shell and content load from cache; `offline.html` is the final fallback.
 
 4) (Optional) Build desktop installers after the web app is built:
 
@@ -76,11 +82,19 @@ The desktop build copies the web `dist/` into the desktop app and produces insta
   - Android (Chrome): Menu → Install app.
   - iOS (Safari): Share → Add to Home Screen.
 - Share easily:
-  - Open Settings → Get the App → use Share / Copy URL / QR to install on other devices.
+  - Open the **Get App** page (tab in the header) → use Share / Copy URL / QR to install on other devices.
+  - The QR opens `/?install=1`, which routes directly to the Get App page and shows install guidance.
 - Works offline:
   - The app shells and assets are cached; an offline page appears if the network is down.
 - Updates:
   - A background service worker fetches new versions; you’ll see an “Update available” toast to reload.
+
+## Environment Variables
+
+- `VITE_PUBLIC_BASE_URL`
+  - Recommended for production to ensure QR/share always point to the canonical domain, e.g. `https://your-domain/`.
+  - For dev LAN testing, you can create `apps/web/.env.local` with `VITE_PUBLIC_BASE_URL=http://<LAN_IP>:5174/`.
+
 
 ## Releasing
 

@@ -1,12 +1,12 @@
 import { writable, type Writable } from 'svelte/store'
 
-export type Page = 'timer'|'templates'|'settings'
+export type Page = 'timer'|'templates'|'getapp'|'settings'
 
 export const route: Writable<Page> = writable('timer')
 
 function parseTabParam(url: URL): Page | null {
   const tab = url.searchParams.get('tab')
-  if (tab === 'timer' || tab === 'templates' || tab === 'settings') return tab
+  if (tab === 'timer' || tab === 'templates' || tab === 'getapp' || tab === 'settings') return tab
   return null
 }
 

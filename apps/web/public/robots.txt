@@ -1,0 +1,4 @@
+# robots.txt for Cadence PWA
+# Allow crawling (no sensitive content). If you prefer to block indexing, change to: Disallow: /
+User-agent: *
+Allow: /

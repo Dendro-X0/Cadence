@@ -2,11 +2,11 @@
   import { createEventDispatcher } from 'svelte'
   import { settings as settingsStore } from '../../stores/settings'
 
-  export let active: 'timer'|'templates'|'settings'|'shortcuts' = 'timer'
+  export let active: 'timer'|'templates'|'getapp'|'settings'|'shortcuts' = 'timer'
   export let showShortcuts: boolean = true
-  const dispatch = createEventDispatcher<{ change: 'timer'|'templates'|'settings'|'shortcuts' }>()
+  const dispatch = createEventDispatcher<{ change: 'timer'|'templates'|'getapp'|'settings'|'shortcuts' }>()
 
-  function set(page: 'timer'|'templates'|'settings'|'shortcuts'): void {
+  function set(page: 'timer'|'templates'|'getapp'|'settings'|'shortcuts'): void {
     if (page !== active) {
       active = page
       dispatch('change', page)
@@ -15,6 +15,7 @@
 
   $: keyTimer = ($settingsStore.shortcutTimerTab ?? 't') as string
   $: keyTemplates = ($settingsStore.shortcutTemplatesTab ?? 'e') as string
+  $: keyGetApp = 'g' as string
   $: keySettings = ($settingsStore.shortcutSettingsTab ?? 's') as string
   $: keyShortcuts = ($settingsStore.shortcutShortcutsTab ?? 'k') as string
 </script>
@@ -25,6 +26,9 @@
   </button>
   <button class="tab {active==='templates'?'active':''}" aria-keyshortcuts={keyTemplates} on:click={() => set('templates')}>
     <span>Templates</span><kbd class="kbd">{keyTemplates}</kbd>
+  </button>
+  <button class="tab {active==='getapp'?'active':''}" aria-keyshortcuts={keyGetApp} on:click={() => set('getapp')}>
+    <span>Get App</span><kbd class="kbd">{keyGetApp}</kbd>
   </button>
   <button class="tab {active==='settings'?'active':''}" aria-keyshortcuts={keySettings} on:click={() => set('settings')}>
     <span>Settings</span><kbd class="kbd">{keySettings}</kbd>

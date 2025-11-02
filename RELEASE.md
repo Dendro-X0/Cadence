@@ -22,17 +22,23 @@ This document describes how to build and publish Web, Desktop (Tauri v2), and Mo
 3. Merge the Version PR to bump versions and generate changelogs.
 
 ## Web (Vercel)
-- Project root: `apps/web/`
-- Build command: `pnpm build` (configured in `apps/web/vercel.json`)
-- Output: `dist`
-- SPA rewrites and long-cache headers are configured in `apps/web/vercel.json`.
+- Project Root: `apps/web/`
+- Install Command: `npm ci`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- SPA rewrites and cache headers: `apps/web/vercel.json` (routes + headers)
 - PWA: Service worker with offline fallback and an "Update available" toast.
+- Environment:
+  - `VITE_PUBLIC_BASE_URL` → set to your public URL (e.g. `https://your-domain/`) so QR/share use the canonical domain.
 
 Local:
 ```bash
 npm --workspace apps/web run dev
 npm --workspace apps/web run build
+npm --workspace apps/web run preview
 ```
+- Dev server binds to `0.0.0.0` for LAN testing.
+- Use `preview` to validate offline (DevTools → Network → Offline → reload).
 
 ## Desktop (Tauri v2)
 - Config: `apps/desktop/src-tauri/tauri.conf.json`
@@ -113,6 +119,15 @@ npm --workspace apps/desktop run tauri ios build
   - Place under `plugins.updater` (not root-level `updater`).
 - GitHub Pages 404:
   - `deploy-web.yml` is manual-only. Vercel is the primary web host.
+
+## 0.2.1 Release Notes (summary)
+
+- Added dedicated **Get App** page (tab) with QR/share/install guidance.
+- Canonical URL support via `VITE_PUBLIC_BASE_URL`; QR links use `/?install=1` to deep-link to the page.
+- PWA improvements: devOptions enabled for testing; offline verified in preview build.
+- SEO polish: `robots.txt`, meta description; Lighthouse 100 across metrics.
+- Dev UX: Vite serves on `0.0.0.0` for LAN QR testing.
+- Tauri CLI updated to `^2.9.x` in desktop workspace.
 
 ## Checklists
 - Web:

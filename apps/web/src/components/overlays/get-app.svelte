@@ -6,14 +6,30 @@
 
   let appUrl: string = ''
   let qrSrc: string = ''
-  let installAvailable: boolean = false
   let deferred: BeforeInstallPromptEvent | null = null
 
   type Platform = 'ios'|'android'|'desktop'|'other'
   let platform: Platform = 'other'
 
   const close = (): void => { dispatch('close') }
-  const computeQr = (url: string): string => `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`
+  const computeAppUrl = (): string => {
+    const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env
+    const base = env?.VITE_PUBLIC_BASE_URL
+    if (base) return new URL('/?install=1', base).toString()
+    const origin = window.location.origin
+    return new URL('/?install=1', origin).toString()
+  }
+  const buildQr = async (url: string): Promise<string> => {
+    try {
+      const mod = await import('qrcode') as unknown as { default: { toDataURL: (text: string) => Promise<string> } }
+      const q = mod?.default
+      if (q && typeof q.toDataURL === 'function') return await q.toDataURL(url)
+    } catch {}
+    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`
+  }
+  const openExternal = async (): Promise<void> => {
+    try { window.open(appUrl, '_blank', 'noopener,noreferrer') } catch {}
+  }
   const detectPlatform = (ua: string): Platform => {
     const low = ua.toLowerCase()
     if (/iphone|ipad|ipod/.test(low)) return 'ios'
@@ -35,21 +51,21 @@
     } catch {}
   }
   const installApp = async (): Promise<void> => {
-    if (!deferred) return
-    try { await deferred.prompt(); await deferred.userChoice } catch {}
-    installAvailable = false
-    deferred = null
+    if (deferred) {
+      try { await deferred.prompt(); await deferred.userChoice } catch {}
+      deferred = null
+      return
+    }
+    await openExternal()
   }
 
   onMount(() => {
-    const origin = window.location.origin
-    appUrl = new URL('/', origin).toString()
-    qrSrc = computeQr(appUrl)
+    appUrl = computeAppUrl()
+    ;(async () => { qrSrc = await buildQr(appUrl) })()
     platform = detectPlatform(navigator.userAgent || '')
     window.addEventListener('beforeinstallprompt', (e: Event) => {
       e.preventDefault?.()
       deferred = e as BeforeInstallPromptEvent
-      installAvailable = true
     })
   })
 
@@ -71,7 +87,8 @@
             <div class="tip">• {tip}</div>
           {/each}
           <div class="actions">
-            <button class="btn" on:click={installApp} disabled={!installAvailable}>Install</button>
+            <button class="btn" on:click={installApp}>Install</button>
+            <button class="btn secondary" on:click={openExternal} aria-label="Open in browser">Open</button>
             <button class="btn secondary" on:click={copyUrl} aria-label="Copy app URL">Copy URL</button>
             <button class="btn secondary" on:click={shareApp} aria-label="Share app">Share</button>
           </div>

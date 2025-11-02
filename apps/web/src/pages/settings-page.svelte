@@ -14,7 +14,14 @@
     tabsPlacement: 'top',
     glassEffect: 'off'
   }
-  let installAvailable: boolean = false
+  async function openExternal(): Promise<void> {
+    try {
+      const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env
+      const base = env?.VITE_PUBLIC_BASE_URL
+      const url = base ? new URL('/?install=1', base).toString() : new URL('/?install=1', window.location.origin).toString()
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {}
+  }
   let deferred: BeforeInstallPromptEvent | null = null
 
   onMount(async () => {
@@ -41,7 +48,6 @@
     window.addEventListener('beforeinstallprompt', (e: Event) => {
       e.preventDefault?.()
       deferred = e as BeforeInstallPromptEvent
-      installAvailable = true
     })
   })
 
@@ -131,13 +137,12 @@
   function alwaysOnTopChange(e: Event): void { const el = e.target as HTMLInputElement; void onAlwaysOnTop(Boolean(el.checked)) }
   function rememberWindowChange(e: Event): void { const el = e.target as HTMLInputElement; void onRememberWindowState(Boolean(el.checked)) }
   async function installApp(): Promise<void> {
-    if (!deferred) return
-    try {
-      await deferred.prompt()
-      await deferred.userChoice
-    } catch {}
-    installAvailable = false
-    deferred = null
+    if (deferred) {
+      try { await deferred.prompt(); await deferred.userChoice } catch {}
+      deferred = null
+      return
+    }
+    await openExternal()
   }
 
   interface BeforeInstallPromptEvent extends Event {
@@ -145,71 +150,11 @@
     userChoice: Promise<{ outcome: 'accepted'|'dismissed' }>
   }
 
-  // Get the App panel helpers
-  let appUrl: string = ''
-  let qrSrc: string = ''
-  type Platform = 'ios'|'android'|'desktop'|'other'
-  let platform: Platform = 'other'
-
-  function detectPlatform(ua: string): Platform {
-    const low = ua.toLowerCase()
-    if (/iphone|ipad|ipod/.test(low)) return 'ios'
-    if (/android/.test(low)) return 'android'
-    if (/windows|mac os|macos|linux/.test(low)) return 'desktop'
-    return 'other'
-  }
-
-  function computeQr(url: string): string { return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}` }
-
-  function platformTips(p: Platform): readonly string[] {
-    if (p === 'ios') return ['Open in Safari', 'Share', 'Add to Home Screen'] as const
-    if (p === 'android') return ['Open in Chrome', 'Menu', 'Install app'] as const
-    if (p === 'desktop') return ['Click the Install button in the address bar', 'Or use the browser App menu'] as const
-    return ['Use your browser’s Install/Add to Home Screen'] as const
-  }
-
-  async function copyUrl(): Promise<void> { try { await navigator.clipboard.writeText(appUrl) } catch {} }
-  async function shareApp(): Promise<void> {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'Cadence', text: 'Try Cadence – a fast, installable PWA timer.', url: appUrl })
-      } else {
-        await navigator.clipboard.writeText(appUrl)
-      }
-    } catch {}
-  }
-
-  onMount(() => {
-    const origin = window.location.origin
-    appUrl = new URL('/', origin).toString()
-    qrSrc = computeQr(appUrl)
-    platform = detectPlatform(navigator.userAgent || '')
-  })
+  
 </script>
 
 <div class="card settings">
   <div class="title">Settings</div>
-
-<div class="card getapp" aria-labelledby="getapp-title">
-  <div id="getapp-title" class="title">Get the App</div>
-  <div class="tips">
-    <div class="left">
-      <div class="hint">Quick install tips</div>
-      {#each platformTips(platform) as tip}
-        <div class="tip">• {tip}</div>
-      {/each}
-      <div class="actions">
-        <button class="btn" on:click={installApp} disabled={!installAvailable}>Install</button>
-        <button class="btn secondary" on:click={copyUrl} aria-label="Copy app URL">Copy URL</button>
-        <button class="btn secondary" on:click={shareApp} aria-label="Share app">Share</button>
-      </div>
-    </div>
-    <div class="qr">
-      <img src={qrSrc} alt="QR code to open Cadence" width="160" height="160" />
-      <div class="url" title={appUrl}>{appUrl}</div>
-    </div>
-  </div>
-</div>
   <div class="row">
     <span>Theme</span>
     <select class="select" bind:value={s.theme} on:change={themeChange}>
@@ -242,7 +187,7 @@
   </div>
   <div class="row">
     <span>Install</span>
-    <button class="btn secondary" on:click={installApp} disabled={!installAvailable}>Install App</button>
+    <button class="btn secondary" on:click={installApp}>Install App</button>
   </div>
   <div class="row">
     <span>Window Effect</span>
@@ -281,12 +226,4 @@
   .switch:after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:#e2e8f0;transition:left .15s ease}
   .switch:checked{background:#0ea5e9;border-color:transparent}
   .switch:checked:after{left:22px;background:#001018}
-  .getapp{margin-top:14px}
-  .tips{display:flex;gap:16px;align-items:center;justify-content:space-between}
-  .left{display:flex;flex-direction:column;gap:6px}
-  .hint{color:#94a3b8;font-size:12px}
-  .tip{color:#e2e8f0}
-  .actions{display:flex;gap:8px;margin-top:6px}
-  .qr{display:flex;flex-direction:column;align-items:center;gap:6px}
-  .url{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8;font-size:12px}
 </style>

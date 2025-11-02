@@ -1,12 +1,11 @@
 {
   "name": "@cadence/web-svelte",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Cadence UI (Svelte) — desktop/web PWA front-end.",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node ./scripts/gen-icons.mjs",
     "build": "vite build",
     "preview": "vite preview --port 4174",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
@@ -17,17 +16,18 @@
     "@cadence/storage": "file:../../packages/storage",
     "@cadence/templates": "file:../../packages/templates",
     "@cadence/ui": "file:../../packages/ui",
-    "@tauri-apps/api": "^2.0.0",
-    "svelte": "^4.2.15"
+    "@tauri-apps/api": "^2.9.0",
+    "qrcode": "^1.5.4",
+    "svelte": "^5.43.2"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^3.1.2",
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "svelte-preprocess": "^6.0.3",
     "typescript": "^5.9.2",
-    "vite": "^5.4.11",
+    "vite": "^7.1.12",
     "vite-plugin-pwa": "^1.1.0",
-    "vite-tsconfig-paths": "^4.3.2",
-    "svelte-check": "^4.0.0",
+    "vite-tsconfig-paths": "^5.1.4",
+    "svelte-check": "^4.3.3",
     "@resvg/resvg-js": "^2.6.2"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@cadence/desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Desktop wrapper for Focus Motive using Tauri v2",
@@ -10,6 +10,6 @@
     "build": "tauri build"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
+    "@tauri-apps/cli": "^2.9.2"
   }
 }

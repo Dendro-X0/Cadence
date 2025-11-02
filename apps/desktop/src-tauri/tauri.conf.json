@@ -1,12 +1,12 @@
 {
-  "$schema": "../../../node_modules/@tauri-apps/cli/config.schema.json",
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cadence Desktop",
   "version": "0.1.0",
   "identifier": "com.cadence.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://127.0.0.1:5174",
-    "beforeDevCommand": "pnpm -C ../../apps/web dev",
+    "beforeDevCommand": "npm --prefix ../../apps/web run dev",
     "beforeBuildCommand": "npm --prefix ../../apps/web run build && node ../../tooling/scripts/copy-web-dist.mjs"
   },
   "app": {

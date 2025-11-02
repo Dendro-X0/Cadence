@@ -4,6 +4,7 @@
   import PageTabs from './components/tabs/page-tabs.svelte'
   import TimerPage from './pages/timer-page.svelte'
   import SettingsPage from './pages/settings-page.svelte'
+  import GetAppPage from './pages/get-app-page.svelte'
   import ShortcutsPage from './pages/shortcuts-page.svelte'
   import TemplatesPage from './pages/templates-page.svelte'
   import { loadSettings } from './stores/settings'
@@ -16,10 +17,10 @@
   import { overlays, hideShortcuts, toggleShortcuts, hideGetApp } from './stores/overlays'
   import { route, initRouterFromUrl, switchTo, type Page } from './stores/router'
 
-  let active: 'timer'|'templates'|'settings'|'shortcuts' = 'timer'
+  let active: 'timer'|'templates'|'getapp'|'settings'|'shortcuts' = 'timer'
   $: active = $route as any
   let isMobile: boolean = false
-  function onTabChange(page: 'timer'|'templates'|'settings'|'shortcuts'): void {
+  function onTabChange(page: 'timer'|'templates'|'getapp'|'settings'|'shortcuts'): void {
     if (isMobile && page === 'shortcuts') return
     if (page === 'shortcuts') { active = 'shortcuts' }
     else switchTo(page as Page)
@@ -32,6 +33,15 @@
 
     // Initialize router from URL (?tab=...)
     initRouterFromUrl()
+
+    // If landing with ?install=1, guide user to dedicated Get App page
+    try {
+      const url = new URL(window.location.href)
+      if (url.searchParams.get('install') === '1') {
+        switchTo('getapp')
+        hideShortcuts()
+      }
+    } catch {}
 
     function parseShortcut(spec?: string | null): (e: KeyboardEvent) => boolean {
       const raw = (spec ?? '').trim()
@@ -128,6 +138,8 @@
       <TimerPage />
     {:else if active === 'templates'}
       <TemplatesPage />
+    {:else if active === 'getapp'}
+      <GetAppPage />
     {:else if active === 'settings'}
       <SettingsPage />
     {:else}
