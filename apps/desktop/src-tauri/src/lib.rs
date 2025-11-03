@@ -87,15 +87,21 @@ pub fn run() {
       #[cfg(not(target_os = "windows"))]
       let use_shadow = true;
 
-      WebviewWindowBuilder::new(app, "main", url)
+      let mut builder = WebviewWindowBuilder::new(app, "main", url)
         .title("@cadence/desktop")
         .inner_size(1200.0, 850.0)
         .min_inner_size(900.0, 640.0)
         .resizable(true)
         .decorations(false)
-        .shadow(use_shadow)
-        .transparent(transparent)
-        .build()?;
+        .shadow(use_shadow);
+
+      // The `transparent` builder method is only available on Windows in our current tauri version
+      #[cfg(target_os = "windows")]
+      {
+        builder = builder.transparent(transparent);
+      }
+
+      builder.build()?;
 
       // Webview is transparent via window transparency; no explicit background color needed
 
