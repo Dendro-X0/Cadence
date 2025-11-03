@@ -7,6 +7,7 @@
   let appUrl: string = ''
   let qrSrc: string = ''
   let deferred: BeforeInstallPromptEvent | null = null
+  let canPrompt: boolean = false
 
   type Platform = 'ios'|'android'|'desktop'|'other'
   let platform: Platform = 'other'
@@ -51,12 +52,10 @@
     } catch {}
   }
   const installApp = async (): Promise<void> => {
-    if (deferred) {
-      try { await deferred.prompt(); await deferred.userChoice } catch {}
-      deferred = null
-      return
-    }
-    await openExternal()
+    if (!deferred) return
+    try { await deferred.prompt(); await deferred.userChoice } catch {}
+    deferred = null
+    canPrompt = false
   }
 
   onMount(() => {
@@ -66,7 +65,9 @@
     window.addEventListener('beforeinstallprompt', (e: Event) => {
       e.preventDefault?.()
       deferred = e as BeforeInstallPromptEvent
+      canPrompt = true
     })
+    window.addEventListener('appinstalled', () => { deferred = null; canPrompt = false })
   })
 
   interface BeforeInstallPromptEvent extends Event {
@@ -87,7 +88,9 @@
             <div class="tip">• {tip}</div>
           {/each}
           <div class="actions">
-            <button class="btn" on:click={installApp}>Install</button>
+            {#if canPrompt}
+              <button class="btn" on:click={installApp}>Install</button>
+            {/if}
             <button class="btn secondary" on:click={openExternal} aria-label="Open in browser">Open</button>
             <button class="btn secondary" on:click={copyUrl} aria-label="Copy app URL">Copy URL</button>
             <button class="btn secondary" on:click={shareApp} aria-label="Share app">Share</button>
