@@ -10,7 +10,7 @@ export default defineConfig({
     tsconfigPaths(),
     svelte(),
     VitePWA({
-      devOptions: { enabled: true },
+      devOptions: { enabled: false },
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'offline.html', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon-180.png'],
       manifest: {
@@ -62,5 +62,5 @@ export default defineConfig({
       }
     })
   ],
-  server: { port: 5174, strictPort: true, host: '0.0.0.0' }
+  server: { port: 5174, strictPort: false, host: '0.0.0.0' }
 })

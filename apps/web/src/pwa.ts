@@ -3,6 +3,8 @@ import { registerSW } from 'virtual:pwa-register'
 import { showUpdateToast } from './stores/overlays'
 
 export function setupPwa(): void {
+  // Never register SW in development: avoids dev-sw cache/control issues during local debugging
+  if (import.meta.env.DEV) return
   // Diagnostic: allow disabling SW with ?nosw=1 to bypass stale/broken workers after routing changes
   try {
     const url = new URL(window.location.href)
