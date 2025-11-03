@@ -27,7 +27,8 @@ export default defineConfig({
         shortcuts: [
           { name: 'Timer', url: '/?tab=timer', description: 'Open the Timer' },
           { name: 'Templates', url: '/?tab=templates', description: 'Browse templates' },
-          { name: 'Settings', url: '/?tab=settings', description: 'Open settings' }
+          { name: 'Settings', url: '/?tab=settings', description: 'Open settings' },
+          { name: 'Get App', url: '/?tab=getapp', description: 'Install or share the app' }
         ],
         icons: [
           { src: 'favicon.svg', sizes: '64x64', type: 'image/svg+xml', purpose: 'any maskable' },
@@ -39,6 +40,7 @@ export default defineConfig({
         navigateFallback: 'offline.html',
         cleanupOutdatedCaches: true,
         clientsClaim: true,
+        navigationPreload: true,
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         runtimeCaching: [
           {
