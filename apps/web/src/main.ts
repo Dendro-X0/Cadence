@@ -19,8 +19,8 @@ try {
   const target = getTarget()
   app = mount(App, { target })
   setupPwa()
-  // expose for quick manual debugging
-  ;(window as unknown as { __cadence?: App }).__cadence = app
+  // expose for quick manual debugging (typed as unknown to avoid API mismatch)
+  ;(window as unknown as { __cadence?: unknown }).__cadence = app
 } catch (err) {
   try { renderError(getTarget(), err) } catch {}
   // eslint-disable-next-line no-console

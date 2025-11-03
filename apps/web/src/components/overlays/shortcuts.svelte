@@ -13,7 +13,7 @@
 
 {#if visible}
   <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
-    <button type="button" class="backdrop" aria-label="Close shortcuts" on:click={close} />
+    <button type="button" class="backdrop" aria-label="Close shortcuts" on:click={close}></button>
     <div class="card" role="document">
       <div id="shortcuts-title" class="title">Keyboard Shortcuts</div>
       <ul>

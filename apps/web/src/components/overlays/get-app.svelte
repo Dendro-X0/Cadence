@@ -77,7 +77,7 @@
 
 {#if visible}
   <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="getapp-title">
-    <button type="button" class="backdrop" aria-label="Close" on:click={close} />
+    <button type="button" class="backdrop" aria-label="Close" on:click={close}></button>
     <div class="card" role="document">
       <div id="getapp-title" class="title">Get the App</div>
       <div class="tips">
