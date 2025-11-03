@@ -1,6 +1,12 @@
 {
   "version": 2,
   "rewrites": [
+    { "source": "/assets/:path*", "destination": "/assets/:path*" },
+    { "source": "/icons/:path*", "destination": "/icons/:path*" },
+    { "source": "/sw.js", "destination": "/sw.js" },
+    { "source": "/workbox-:hash.js", "destination": "/workbox-:hash.js" },
+    { "source": "/manifest.webmanifest", "destination": "/manifest.webmanifest" },
+    { "source": "/offline.html", "destination": "/offline.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
